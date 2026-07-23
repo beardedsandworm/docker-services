@@ -30,3 +30,7 @@ pantry.wormlogic.com {
 esphome.wormlogic.com {
     reverse_proxy esphome:6052
 }
+
+monitor.wormlogic.com {
+    reverse_proxy beszel:8090
+}

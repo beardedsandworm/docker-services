@@ -65,6 +65,27 @@ services:
     networks:
       - proxy_network
 
+  beszel:
+    container_name: beszel
+    image: henrygd/beszel:latest
+    restart: unless-stopped
+    environment:
+      APP_URL: "https://monitor.wormlogic.com"
+    volumes:
+      - ./config/beszel/data:/beszel_data
+    healthcheck:
+      test:
+        - CMD
+        - /beszel
+        - health
+        - --url
+        - http://localhost:8090
+      interval: 120s
+      start_period: 10s
+      timeout: 5s
+    networks:
+      - proxy_network
+
   searxng:
     container_name: searxng
     image: searxng/searxng:latest

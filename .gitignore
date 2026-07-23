@@ -27,6 +27,10 @@ config/caddy/data/*
 config/caddy/config/*
 !config/caddy/config/.gitkeep
 
+# Beszel runtime
+config/beszel/data/*
+!config/beszel/data/.gitkeep
+
 # misc
 *.log
 .DS_Store
