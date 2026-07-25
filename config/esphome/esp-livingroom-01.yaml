@@ -1,0 +1,13 @@
+substitutions:
+  device_name: esp-livingroom-01
+  friendly_name: Living Room ESP 01
+  area: Living Room
+
+  api_encryption_key: !secret esp_livingroom_01_api_key
+  ota_password: !secret esp_livingroom_01_ota_password
+
+packages:
+  common: !include packages/common.yaml
+  wifi: !include packages/wifi.yaml
+  diagnostics: !include packages/diagnostics.yaml
+  bluetooth_proxy: !include packages/bluetooth-proxy.yaml

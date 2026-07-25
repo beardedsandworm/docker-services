@@ -1,0 +1,19 @@
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  area: ${area}
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+
+api:
+  encryption:
+    key: ${api_encryption_key}
+
+ota:
+  - platform: esphome
+    password: ${ota_password}

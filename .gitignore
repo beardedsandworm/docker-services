@@ -48,6 +48,7 @@ config/postgres/data/*
 
 # ESPHome generated data and local secrets
 config/esphome/.esphome/
+config/esphome/.device-builder*
 config/esphome/secrets.yaml
 config/esphome/.gitignore
 
