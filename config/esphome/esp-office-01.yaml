@@ -2,6 +2,7 @@ substitutions:
   device_name: esp-office-01
   friendly_name: Office ESP 01
   area: Office
+  board: esp32dev
 
   api_encryption_key: !secret esp_office_01_api_key
   ota_password: !secret esp_office_01_ota_password

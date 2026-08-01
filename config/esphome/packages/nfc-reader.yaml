@@ -1,0 +1,195 @@
+# WormLogic NFC reader hardware and tag-reading behavior.
+# Derived from https://github.com/leinich/tagreader
+#
+# Wiring:
+#   PN532 SDA  -> GPIO21
+#   PN532 SCL  -> GPIO22
+#   WS2811 DIN -> GPIO16
+#   Buzzer     -> GPIO17
+
+esphome:
+  project:
+    name: wormlogic.nfc_reader
+    version: "1.0"
+
+  on_boot:
+    priority: -10
+    then:
+      - wait_until:
+          api.connected:
+      - logger.log: "API is connected!"
+      - rtttl.play: "success:d=32,o=5,b=100:c,g,b"
+      - light.turn_on:
+          id: activity_led
+          brightness: 100%
+          red: 0%
+          green: 0%
+          blue: 100%
+          flash_length: 500ms
+
+      - delay: 500ms
+
+      # Idle state
+      - light.turn_on:
+          id: activity_led
+          brightness: 20%
+          red: 100%
+          green: 0%
+          blue: 100%
+
+      - switch.turn_on: buzzer_enabled
+      - switch.turn_on: led_enabled
+
+switch:
+  - platform: template
+    name: "${friendly_name} Buzzer Enabled"
+    id: buzzer_enabled
+    icon: mdi:volume-high
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    entity_category: config
+
+  - platform: template
+    name: "${friendly_name} LED Enabled"
+    id: led_enabled
+    icon: mdi:alarm-light-outline
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    entity_category: config
+
+i2c:
+  sda: GPIO21
+  scl: GPIO22
+  scan: false
+  frequency: 400kHz
+
+globals:
+  - id: source
+    type: std::string
+
+  - id: url
+    type: std::string
+
+  - id: info
+    type: std::string
+
+pn532_i2c:
+  id: pn532_board
+
+  on_tag:
+    then:
+      - if:
+          condition:
+            switch.is_on: led_enabled
+          then:
+            - light.turn_on:
+                id: activity_led
+                brightness: 100%
+                red: 0%
+                green: 100%
+                blue: 0%
+                flash_length: 500ms
+
+      - delay: 150ms
+
+      - lambda: |-
+          id(source) = "";
+          id(url) = "";
+          id(info) = "";
+
+          if (tag.has_ndef_message()) {
+            auto message = tag.get_ndef_message();
+            auto records = message->get_records();
+
+            for (auto &record : records) {
+              std::string payload = record->get_payload();
+              std::string type = record->get_type();
+
+              size_t hass = payload.find("https://www.home-assistant.io/tag/");
+              size_t applemusic = payload.find("https://music.apple.com");
+              size_t spotify = payload.find("https://open.spotify.com");
+              size_t sonos = payload.find("sonos-2://");
+
+              if (type == "U" && hass != std::string::npos) {
+                ESP_LOGD("tagreader", "Found Home Assistant tag NDEF");
+                id(source) = "hass";
+                id(url) = payload;
+                id(info) = payload.substr(hass + 34);
+              } else if (type == "U" && applemusic != std::string::npos) {
+                ESP_LOGD("tagreader", "Found Apple Music tag NDEF");
+                id(source) = "amusic";
+                id(url) = payload;
+              } else if (type == "U" && spotify != std::string::npos) {
+                ESP_LOGD("tagreader", "Found Spotify tag NDEF");
+                id(source) = "spotify";
+                id(url) = payload;
+              } else if (type == "U" && sonos != std::string::npos) {
+                ESP_LOGD("tagreader", "Found Sonos app tag NDEF");
+                id(source) = "sonos";
+                id(url) = payload;
+              } else if (type == "T") {
+                ESP_LOGD("tagreader", "Found music info tag NDEF");
+                id(info) = payload;
+              } else if (id(source) == "") {
+                id(source) = "uid";
+              }
+            }
+          } else {
+            id(source) = "uid";
+          }
+
+      - if:
+          condition:
+            lambda: 'return id(source) == "uid";'
+          then:
+            - homeassistant.tag_scanned: !lambda |-
+                ESP_LOGD("tagreader", "No HA NDEF, using UID");
+                return x;
+          else:
+            - if:
+                condition:
+                  lambda: 'return id(source) == "hass";'
+                then:
+                  - homeassistant.tag_scanned: !lambda 'return id(info);'
+                else:
+                  - homeassistant.event:
+                      event: esphome.music_tag
+                      data:
+                        reader: !lambda |-
+                          return App.get_name().c_str();
+                        source: !lambda |-
+                          return id(source);
+                        url: !lambda |-
+                          return id(url);
+                        info: !lambda |-
+                          return id(info);
+
+      - if:
+          condition:
+            switch.is_on: buzzer_enabled
+          then:
+            - rtttl.play: "success:d=16,o=5,b=100:c,g,b"
+
+  on_tag_removed:
+    then:
+      - homeassistant.event:
+          event: esphome.tag_removed
+
+output:
+  - platform: ledc
+    pin: GPIO17
+    id: buzzer
+
+rtttl:
+  output: buzzer
+
+light:
+  - platform: esp32_rmt_led_strip
+    chipset: WS2811
+    pin: GPIO16
+    num_leds: 1
+    rgb_order: GRB
+    flash_transition_length: 500ms
+    id: activity_led
+    name: "${friendly_name} LED"
+    restore_mode: ALWAYS_OFF

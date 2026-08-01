@@ -4,7 +4,7 @@ esphome:
   area: ${area}
 
 esp32:
-  board: esp32dev
+  board: ${board}
   framework:
     type: esp-idf
 

@@ -1,0 +1,84 @@
+substitutions:
+  device_name: esp-bedroom-button-01
+  friendly_name: Bedroom Smart Button
+  area: Bedroom
+  board: esp32-c3-devkitm-1
+
+  api_encryption_key: !secret esp_bedroom_button_01_api_key
+  ota_password: !secret esp_bedroom_button_01_ota_password
+
+packages:
+  common: !include packages/common.yaml
+  wifi: !include packages/wifi.yaml
+  diagnostics: !include packages/diagnostics.yaml
+  bluetooth: !include packages/bluetooth-proxy.yaml
+
+event:
+  - platform: template
+    name: Button Action
+    id: button_action
+    device_class: button
+    event_types:
+      - single_press
+      - double_press
+      - triple_press
+      - long_press
+
+binary_sensor:
+  - platform: gpio
+    id: physical_button
+    internal: true
+
+    pin:
+      number: GPIO7
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+
+    filters:
+      - delayed_on_off: 20ms
+
+    on_multi_click:
+      # Triple press must be evaluated before shorter patterns.
+      - timing:
+          - ON for 40ms to 500ms
+          - OFF for 40ms to 400ms
+          - ON for 40ms to 500ms
+          - OFF for 40ms to 400ms
+          - ON for 40ms to 500ms
+          - OFF for at least 500ms
+        then:
+          - event.trigger:
+              id: button_action
+              event_type: triple_press
+          - logger.log: "Triple press"
+
+      - timing:
+          - ON for 40ms to 500ms
+          - OFF for 40ms to 400ms
+          - ON for 40ms to 500ms
+          - OFF for at least 500ms
+        then:
+          - event.trigger:
+              id: button_action
+              event_type: double_press
+          - logger.log: "Double press"
+
+      - timing:
+          - ON for 40ms to 500ms
+          - OFF for at least 500ms
+        then:
+          - event.trigger:
+              id: button_action
+              event_type: single_press
+          - logger.log: "Single press"
+
+      - timing:
+          - ON for at least 1000ms
+          - OFF for at least 100ms
+        then:
+          - event.trigger:
+              id: button_action
+              event_type: long_press
+          - logger.log: "Long press"

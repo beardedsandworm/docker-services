@@ -31,6 +31,11 @@ sops --decrypt \
   --output "${RUNTIME_DIR}/esphome-secrets.yaml" \
   "${SECRETS_DIR}/esphome-secrets.yaml.enc"
 
+sops --decrypt \
+  --output "${RUNTIME_DIR}/mqtt.env" \
+  "${SECRETS_DIR}/mqtt.env.enc"
+
+chmod 600 "${RUNTIME_DIR}/mqtt.env"
 chmod 600 "${RUNTIME_DIR}/esphome-secrets.yaml"
 chmod 600 "${RUNTIME_DIR}/n8n.env"
 chmod 600 "${RUNTIME_DIR}/monkeytype-db.env"

@@ -31,6 +31,14 @@ config/caddy/config/*
 config/beszel/data/*
 !config/beszel/data/.gitkeep
 
+
+# misquito data
+config/mosquitto/data/
+config/mosquitto/config/passwd
+
+# zigbee data
+config/zigbee2mqtt/data/
+
 # misc
 *.log
 .DS_Store

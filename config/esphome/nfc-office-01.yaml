@@ -1,0 +1,15 @@
+substitutions:
+  device_name: nfc-office-01
+  friendly_name: Office NFC Reader
+  area: Office
+  board: esp32dev
+
+  api_encryption_key: !secret nfc_office_01_api_key
+  ota_password: !secret nfc_office_01_ota_password
+
+packages:
+  common: !include packages/common.yaml
+  wifi: !include packages/wifi.yaml
+  diagnostics: !include packages/diagnostics.yaml
+  nfc_reader: !include packages/nfc-reader.yaml
+  nfc_services: !include packages/nfc-services.yaml

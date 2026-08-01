@@ -1,0 +1,166 @@
+# WormLogic NFC reader Home Assistant actions and tag-writing controls.
+# Requires packages/nfc-reader.yaml.
+
+button:
+  - platform: template
+    name: "${friendly_name} Write Tag Random"
+    id: write_tag_random
+    icon: mdi:pencil-box
+    on_press:
+      then:
+        - light.turn_on:
+            id: activity_led
+            brightness: 100%
+            red: 100%
+            green: 0%
+            blue: 100%
+
+        - lambda: |-
+            static const char alphanum[] = "0123456789abcdef";
+            std::string uri = "https://www.home-assistant.io/tag/";
+
+            for (int i = 0; i < 8; i++)
+              uri += alphanum[random_uint32() % (sizeof(alphanum) - 1)];
+
+            uri += "-";
+
+            for (int j = 0; j < 3; j++) {
+              for (int i = 0; i < 4; i++)
+                uri += alphanum[random_uint32() % (sizeof(alphanum) - 1)];
+              uri += "-";
+            }
+
+            for (int i = 0; i < 12; i++)
+              uri += alphanum[random_uint32() % (sizeof(alphanum) - 1)];
+
+            auto message = new nfc::NdefMessage();
+            message->add_uri_record(uri);
+            ESP_LOGD("tagreader", "Writing payload: %s", uri.c_str());
+            id(pn532_board).write_mode(message);
+
+        - rtttl.play: "write:d=16,o=5,b=100:b"
+
+        - wait_until:
+            not:
+              pn532.is_writing:
+
+        - light.turn_off:
+            id: activity_led
+
+        - rtttl.play: "write:d=16,o=5,b=100:b,b"
+
+  - platform: template
+    name: "${friendly_name} Clean Tag"
+    id: clean_tag
+    icon: mdi:nfc-variant-off
+    on_press:
+      then:
+        - light.turn_on:
+            id: activity_led
+            brightness: 100%
+            red: 100%
+            green: 64.7%
+            blue: 0%
+
+        - lambda: 'id(pn532_board).clean_mode();'
+
+        - rtttl.play: "write:d=16,o=5,b=100:b"
+
+        - wait_until:
+            not:
+              pn532.is_writing:
+
+        - light.turn_off:
+            id: activity_led
+
+        - rtttl.play: "write:d=16,o=5,b=100:b,b"
+
+  - platform: template
+    name: "${friendly_name} Cancel Writing"
+    id: cancel_writing
+    icon: mdi:pencil-off
+    on_press:
+      then:
+        - lambda: 'id(pn532_board).read_mode();'
+        - light.turn_off:
+            id: activity_led
+        - rtttl.play: "write:d=16,o=5,b=100:b,b"
+
+api:
+  services:
+    - service: rfidreader_tag_ok
+      then:
+        - rtttl.play: "beep:d=16,o=5,b=100:b"
+
+    - service: rfidreader_tag_ko
+      then:
+        - rtttl.play: "beep:d=8,o=5,b=100:b"
+
+    - service: play_rtttl
+      variables:
+        song_str: string
+      then:
+        - rtttl.play: !lambda 'return song_str;'
+
+    - service: write_tag_id
+      variables:
+        tag_id: string
+      then:
+        - light.turn_on:
+            id: activity_led
+            brightness: 100%
+            red: 100%
+            green: 0%
+            blue: 0%
+
+        - lambda: |-
+            auto message = new nfc::NdefMessage();
+            std::string uri = "https://www.home-assistant.io/tag/";
+            uri += tag_id;
+            message->add_uri_record(uri);
+            id(pn532_board).write_mode(message);
+
+        - rtttl.play: "write:d=16,o=5,b=100:b"
+
+        - wait_until:
+            not:
+              pn532.is_writing:
+
+        - light.turn_off:
+            id: activity_led
+
+        - rtttl.play: "write:d=16,o=5,b=100:b,b"
+
+    - service: write_music_tag
+      variables:
+        music_url: string
+        music_info: string
+      then:
+        - light.turn_on:
+            id: activity_led
+            brightness: 100%
+            red: 100%
+            green: 0%
+            blue: 0%
+
+        - lambda: |-
+            auto message = new nfc::NdefMessage();
+
+            if (music_url != "")
+              message->add_uri_record(music_url);
+
+            if (music_info != "")
+              message->add_text_record(music_info);
+
+            id(pn532_board).write_mode(message);
+
+        - rtttl.play: "write:d=16,o=5,b=100:b"
+
+        - wait_until:
+            not:
+              pn532.is_writing:
+
+        - light.turn_off:
+            id: activity_led
+
+        - rtttl.play: "write:d=16,o=5,b=100:b,b"

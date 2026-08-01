@@ -126,6 +126,54 @@ services:
     networks:
       - proxy_network
 
+  mosquitto:
+    container_name: mosquitto
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+
+    ports:
+      - "1883:1883"
+
+    volumes:
+      - ./config/mosquitto/config:/mosquitto/config
+      - ./config/mosquitto/data:/mosquitto/data
+      - ./config/mosquitto/log:/mosquitto/log
+
+    environment:
+      TZ: "${TZ}"
+
+    networks:
+      - proxy_network
+
+  zigbee2mqtt:
+    container_name: zigbee2mqtt
+    image: ghcr.io/koenkk/zigbee2mqtt:latest
+    restart: unless-stopped
+
+    depends_on:
+      - mosquitto
+
+    env_file:
+      - ./runtime/server01/secrets/mqtt.env
+
+    environment:
+      TZ: "${TZ}"
+      ZIGBEE2MQTT_CONFIG_MQTT_USER: "${MQTT_USERNAME}"
+      ZIGBEE2MQTT_CONFIG_MQTT_PASSWORD: "${MQTT_PASSWORD}"
+
+
+    volumes:
+      - ./config/zigbee2mqtt/data:/app/data
+
+    devices:
+      - /dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0:/dev/ttyUSB0
+
+    ports:
+      - "8080:8080"
+
+    networks:
+      - proxy_network
+
   esphome:
     container_name: esphome
     image: ghcr.io/esphome/esphome:${ESPHOME_VERSION}
@@ -138,7 +186,7 @@ services:
       - ./runtime/server01/secrets/esphome-secrets.yaml:/config/secrets.yaml:ro
       - /etc/localtime:/etc/localtime:ro
     devices:
-      - /dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0:/dev/ttyUSB0
+      - /dev/ttyACM0:/dev/ttyACM0
     networks:
       - proxy_network
 
