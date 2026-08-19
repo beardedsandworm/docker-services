@@ -1,0 +1,19 @@
+[Unit]
+Description=Host macvlan shim for local Pi-hole
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+Environment=PIHOLE_SHIM_NAME=pihole-shim
+Environment=PIHOLE_SHIM_PARENT=eno1
+Environment=PIHOLE_SHIM_CIDR=10.42.42.100/32
+Environment=PIHOLE_IPV4_ADDRESS=10.42.42.11
+
+ExecStart=/usr/local/sbin/pihole-host-shim up
+ExecStop=/usr/local/sbin/pihole-host-shim down
+
+[Install]
+WantedBy=multi-user.target
