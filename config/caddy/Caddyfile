@@ -3,31 +3,49 @@
 	acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
 }
 
+(dns_tls) {
+	tls {
+		propagation_delay 30s
+		propagation_timeout -1
+	}
+}
+
 search.wormlogic.com {
+	import dns_tls
 	reverse_proxy searxng:8080
 }
 
 type.wormlogic.com {
+	import dns_tls
 	reverse_proxy monkeytype-frontend:80
 }
 
 type-api.wormlogic.com {
+	import dns_tls
 	reverse_proxy monkeytype-backend:5005
 }
 
 automate.wormlogic.com {
+	import dns_tls
 	reverse_proxy n8n:5678
 }
 
 ha.wormlogic.com {
-    reverse_proxy 10.42.42.4:8123
+	import dns_tls
+	reverse_proxy 10.42.42.4:8123
 }
 
 pantry.wormlogic.com {
-    reverse_proxy grocy:80
+	import dns_tls
+	reverse_proxy grocy:80
 }
 
 esphome.wormlogic.com {
-    reverse_proxy esphome:6052
+	import dns_tls
+	reverse_proxy esphome:6052
 }
 
+ix.wormlogic.com {
+    import dns_tls
+    reverse_proxy 10.42.42.5:9119
+}
