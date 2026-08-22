@@ -80,7 +80,7 @@ fi
 
 cd "${REPO_ROOT}"
 
-docker compose --env-file "${ENV_FILE}" --profile apps ps --format json \
+docker compose --env-file "${ENV_FILE}" --profile apps ps --all --orphans=false --format json \
   | jq -r '
       if type == "array" then .[] else . end
       | [

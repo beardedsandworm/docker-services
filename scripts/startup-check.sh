@@ -75,7 +75,7 @@ log_success "docker-compose configuration is valid"
 
 log_step "Checking service state..."
 status_lines="$(
-  docker compose --env-file "${ENV_FILE}" --profile apps ps --format json \
+  docker compose --env-file "${ENV_FILE}" --profile apps ps --all --orphans=false --format json \
   | jq -r '
       if type == "array" then .[] else . end
       | "\(.Name // .Service // "unknown")\t\(.State // .Status // "unknown")\t\(.Health // "none")"
