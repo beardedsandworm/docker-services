@@ -86,3 +86,6 @@ config/homeassistant/*
 config/grocy/*
 !config/grocy/.gitkeep
 
+# Omada data
+config/omada/data/
+config/omada/logs/

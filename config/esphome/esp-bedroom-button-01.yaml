@@ -9,7 +9,7 @@ substitutions:
 
 packages:
   common: !include packages/common.yaml
-  wifi: !include packages/wifi.yaml
+  wifi: !include packages/IoT_wifi.yaml
   diagnostics: !include packages/diagnostics.yaml
   bluetooth: !include packages/bluetooth-proxy.yaml
 

@@ -9,7 +9,7 @@ substitutions:
 
 packages:
   common: !include packages/common.yaml
-  wifi: !include packages/wifi.yaml
+  wifi: !include packages/IoT_wifi.yaml
   diagnostics: !include packages/diagnostics.yaml
   nfc_reader: !include packages/nfc-reader.yaml
   nfc_services: !include packages/nfc-services.yaml

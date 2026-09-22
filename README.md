@@ -1,501 +1,181 @@
-# 🐳 docker-services — Automated Container Platform
+# docker-services
 
-> Declarative Docker environment with integrated monitoring, alerting, and event-driven automation.
+Declarative Docker Compose deployment for the services currently hosted on **Arrakis** (`server01`). The repository owns Compose definitions, proxy and application configuration intended for version control, encrypted secret sources, and host-side monitoring units. It does **not** make mutable application data recoverable by itself.
 
----
+## Current deployment
 
-## 🚀 Overview
+Live state verified on Arrakis on 2026-08-22:
 
-This repository manages your **container runtime layer**, including:
+- host: `arrakis`, Ubuntu 24.04 LTS;
+- repository: `/home/lightweight/docker-services`, branch `master`;
+- Compose configuration validates with the live `env/server01.env`;
+- the four Docker monitoring timers and the Pi-hole host shim are enabled and active;
+- 14 declared services are running;
+- `esphome` is stopped because the configured `/dev/ttyACM0` device is absent;
+- an old, stopped `beszel` container remains as a Compose orphan. Beszel Agent runs separately under `/opt/beszel-agent`.
 
-* 🐳 Docker Compose orchestration
-* 📡 Monitoring + health checks
-* 🔔 Event emission into n8n
-* 🧠 Integration with centralized alerting + reporting
-* 🔐 Local secret management (no secrets in Git)
+The snapshot above describes observed state, not a promise that every service is healthy forever. Use the verification commands below for current state.
 
----
+## Services
 
-## ⚠️ Current State
+| Service | Purpose | Network / exposure | Persistent state |
+|---|---|---|---|
+| `pihole` | Primary containerized DNS filter | macvlan address on the home network | `config/pihole/etc-pihole` |
+| `caddy` | Internal reverse proxy and TLS | host ports 80/443; `proxy_network` | `config/caddy/{data,config}` |
+| `searxng` | Private metasearch | Caddy / `proxy_network` | `config/searxng` |
+| `postgres` | Database for n8n and related workflows | internal only | `config/postgres/data` |
+| `n8n` | Automation, event normalization, incident routing | Caddy / `proxy_network` | `config/n8n/data` |
+| `mosquitto` | MQTT broker | host port 1883 | `config/mosquitto` |
+| `zigbee2mqtt` | Zigbee coordinator and bridge | host port 8080; USB serial device | `config/zigbee2mqtt/data` |
+| `esphome` | ESPHome Device Builder | Caddy / `proxy_network`; optional local USB | `config/esphome` |
+| `homeassistant` | Home orchestration | host networking and DBus | `config/homeassistant` |
+| `matter-server` | Matter controller backend | host networking | `config/matter-server/data` |
+| `grocy` | Pantry and household inventory | `apps` profile; Caddy | `config/grocy` |
+| `monkeytype-*` | Self-hosted Monkeytype frontend, backend, MongoDB, and Redis | `apps` profile; Caddy | `config/monkeytype` |
 
-This project is operational for the current homelab, but it is **not yet fully self-deployable**.
+Home Assistant remains on Arrakis deliberately. IX owns the LLM/agent runtime through the separate `llm-services` repository; VPS services are defined in `vps-services`.
 
-It currently assumes:
+## Repository boundary
 
-- host bootstrap is handled by `linux-environments`
-- secrets are restored locally
-- n8n is already configured
-- Postgres schema exists
-- Discord webhooks are created manually
-- internal DNS points service hostnames at the Docker host
+### Versioned here
 
-The long-term goal is full rebuild-from-scratch automation, but this repo still has manual setup steps by design.
+- `compose.yaml` and the custom Caddy image;
+- Caddy routes and authored application configuration;
+- ESPHome device YAML and shared packages;
+- monitoring scripts and systemd units;
+- SOPS-encrypted secret sources under `secrets/server01/`;
+- secret templates and the non-secret environment example.
 
----
+### Local runtime state
 
-## 🏗️ Architecture
+The following are intentionally not Git authority:
+
+- decrypted secrets under `runtime/server01/secrets/`;
+- the live environment file `env/server01.env`;
+- databases, logs, certificates, caches, generated ESPHome builds, and application-owned configuration under `config/`;
+- monitor state under `runtime/server01/monitor/`.
+
+A clean Git tree only proves that tracked deployment files match Git. It does not prove that ignored databases and application configuration are backed up. Recovery still requires approved backups of mutable state and the SOPS/age key needed to decrypt secret sources.
+
+## Networks
+
+- `home_network` is a macvlan used by Pi-hole. The host-side shim is installed as `pihole-host-shim.service` so Arrakis can reach the macvlan service.
+- `proxy_network` is the internal bridge shared by Caddy and proxied services.
+- Home Assistant and Matter Server use host networking for discovery and local integrations.
+- Postgres is intentionally not published to the host network.
+
+Internal DNS must point service hostnames at Arrakis, and Caddy must have a valid Cloudflare API token for DNS-based certificate work.
+
+## Secrets
+
+Encrypted sources are committed with SOPS:
 
 ```text
-                ┌──────────────────────────────┐
-                │     linux-environments       │
-                │ (host bootstrap + services)  │
-                └──────────────┬───────────────┘
-                               │
-                               ▼
-                ┌──────────────────────────────┐
-                │       docker-services        │
-                │   (this repository)          │
-                │                              │
-                │  • docker compose            │
-                │  • monitoring scripts        │
-                │  • systemd timers            │
-                └──────────────┬───────────────┘
-                               │
-                               ▼
-                ┌──────────────────────────────┐
-                │        emit-event.sh         │
-                │  (structured event output)   │
-                └──────────────┬───────────────┘
-                               │
-                               ▼
-                ┌──────────────────────────────┐
-                │             n8n              │
-                │                              │
-                │  • dedupe / suppression      │
-                │  • escalation logic          │
-                │  • recovery detection        │
-                │  • routing decisions         │
-                └──────────────┬───────────────┘
-                               │
-              ┌────────────────┴───────────────┐
-              ▼                                ▼
-    ┌──────────────────────┐        ┌────────────────────────┐
-    │      Postgres        │        │        Discord         │
-    │                      │        │                        │
-    │  incidents           │        │  🚨 alerts             │
-    │  incident_events     │        │  🐳 containers         │
-    │                      │        │  📊 reports            │
-    └──────────────────────┘        └────────────────────────┘
+secrets/server01/*.enc
 ```
 
----
+Decryption writes runtime material to:
 
-## ⚙️ Core Responsibilities
+```text
+runtime/server01/secrets/
+```
 
-### 🐳 Container Orchestration
-
-* Centralized `docker compose` configuration
-* Multi-service management
-* Clean startup / shutdown lifecycle
-
----
-
-### 📡 Monitoring System
-
-Systemd timers execute checks:
-
-| Check            | Purpose                      |
-| ---------------- | ---------------------------- |
-| 🩺 startup-check | validate services after boot |
-| 📊 monitor       | continuous health checks     |
-| 💽 disk-check    | disk usage alerts            |
-| 🐳 image-check   | stale container detection    |
-
----
-
-### 🔔 Event Emission
-
-All checks emit structured events via:
+Do not commit decrypted files. To create the live runtime material:
 
 ```bash
-scripts/emit-event.sh
+./scripts/decrypt-secrets.sh
 ```
 
-Example:
+`N8N_ENCRYPTION_KEY` must be preserved across rebuilds or stored n8n credentials become unreadable.
 
-```json
-{
-  "source": "docker-services",
-  "hostname": "server01",
-  "service": "docker",
-  "check_name": "container-health",
-  "severity": "error",
-  "title": "Container failure",
-  "message": "nginx is unhealthy"
-}
-```
+## Deployment
 
----
-
-## 🔗 n8n Integration
-
-Events are sent to:
-
-```text
-$N8N_EVENT_WEBHOOK_URL
-```
-
-n8n handles:
-
-* 🧹 deduplication
-* 🔁 escalation
-* ♻️ recovery detection
-* 🗄️ Postgres persistence
-* 🚨 alert routing
-* 📊 daily + weekly summaries
-
----
-
-## 🧠 Event Flow
-
-```text
-docker-services
-  ↓
-emit-event.sh
-  ↓
-n8n webhook
-  ↓
-Code (normalize + dedupe)
-  ↓
-Postgres
-  ├─ incidents (active state)
-  └─ incident_events (history)
-  ↓
-IF (alert logic)
-  ↓
-Discord alerts + reports
-```
-
----
-
-## 🔐 Secrets & Configuration
-
-Secrets are stored locally:
-
-```text
-~/.config/docker-services/
-  ├─ discord-webhook
-  ├─ n8n-webhook
-```
-
-Environment config:
-
-```text
-env/server01.env
-```
-
----
-
-## 🐒⌨️ Monkeytype Integration
-
-Self-hosted Monkeytype with local data persistence and automated reporting via n8n.
-
-### Services
-
-- `monkeytype-frontend`
-- `monkeytype-backend`
-- `monkeytype-mongodb`
-- `monkeytype-redis`
-
-### Authentication
-
-- Firebase handles login.
-- MongoDB stores local Monkeytype data.
-- Email verification is disabled for local use.
-
-### Data
-
-Typing results are stored in MongoDB:
-
-```text
-database: monkeytype
-collection: results
-```
-
-Each test stores:
-
-- WPM / raw WPM
-- Accuracy
-- Consistency
-- Duration
-- Timestamp
-- Per-second performance data
-
-### Reporting
-
-Monkeytype reporting is handled through n8n.
-
-```text
-MongoDB → n8n → Discord
-```
-
-Reports are generated using the n8n MongoDB node and formatted with a Code node.
-
-### Reports
-
-#### 🐒⌨️ Daily Report
-
-- Tests completed
-- Average WPM
-- Best WPM
-- Accuracy
-- Time typed
-
-#### 🐒📆 Weekly Report
-
-- Weekly totals
-- Weekly averages
-- Best weekly performance
-
-#### 🐒🗓️ Monthly Report
-
-- Monthly totals
-- Monthly averages
-- Long-term usage patterns
-
-#### 🐒🎆 Year-End Recap
-
-- Previous year summary
-- Total tests
-- Peak performance
-- Total time typed
-
-### Cron Schedules
-
-n8n cron format:
-
-```text
-[Second] [Minute] [Hour] [Day of Month] [Month] [Day of Week]
-```
-
-Recommended schedules:
-
-```text
-Daily:   0 5 0 * * *
-Weekly:  0 5 0 * * 0
-Monthly: 0 5 0 L * *
-Yearly:  0 5 0 1 1 *
-```
-
-### Example Output
-
-```text
-🐒⌨️ Monkeytype Daily Report
-
-User: wormlogic
-Tests: 3
-Avg WPM: 36.01
-Best WPM: 39.61
-Accuracy: 92.14%
-Time Typed: 1.5 min
-```
-
----
-
-## 🧱 Reproducibility Model
-
-Designed for rebuild flow:
-
-```text
-1. bootstrap host (linux-environments)
-2. clone docker-services
-3. restore secrets
-4. install monitoring units
-5. start containers
-```
-
----
-
-## 🛠️ Installation
+Host bootstrap is owned by [`linux-environments`](https://github.com/beardedsandworm/linux-environments). On an already bootstrapped Arrakis:
 
 ```bash
-git clone https://github.com/matthewjgarry/docker-services.git
-cd docker-services
-cp env/example.env env/server01.env
-./scripts/install-monitoring-units.sh
-docker compose --env-file env/server01.env up -d
+git clone git@github.com:beardedsandworm/docker-services.git ~/docker-services
+cd ~/docker-services
+cp env/server01.env.example env/server01.env
+# Fill non-secret host settings, provision the age key, then:
+./scripts/decrypt-secrets.sh
+./scripts/validate.sh
+./scripts/up-apps.sh
+sudo ./scripts/install-monitoring-units.sh
 ```
 
----
+Start the containers before installing the monitoring units: the installer immediately smoke-tests the startup checker and will fail when no Compose services exist. The current installer does not install the Pi-hole macvlan shim; recovery must separately install `scripts/pihole-host-shim.sh` as `/usr/local/sbin/pihole-host-shim`, install `systemd/pihole-host-shim.service`, then reload systemd and enable the unit.
 
-## 🧪 Testing
+Use `./scripts/up.sh` when the `apps` profile (`grocy` and Monkeytype) is intentionally excluded.
 
-### Emit test event
+Common lifecycle commands:
 
 ```bash
-./scripts/emit-event.sh \
-  "docker-services" \
-  "test-check" \
-  "error" \
-  "Test Event" \
-  "This is a test" \
-  "docker"
+./scripts/validate.sh       # render and validate Compose configuration
+./scripts/up.sh             # start core services
+./scripts/up-apps.sh        # start core plus apps-profile services
+./scripts/down.sh           # stop the project
 ```
 
----
+## Monitoring
 
-### Run startup check
+System-level timers run:
+
+| Unit | Purpose |
+|---|---|
+| `docker-services-startup-check.timer` | Validate Compose and inspect all declared services after boot |
+| `docker-services-monitor.timer` | Detect declared container state/health changes every minute |
+| `docker-services-disk-check.timer` | Report disk pressure |
+| `docker-services-image-check.timer` | Report image update state |
+
+Monitoring emits structured events through `scripts/emit-event.sh` when an n8n event webhook is configured. n8n owns deduplication, suppression, incident persistence, escalation, and alert routing. The intended policy is **silence is success**: routine state should not generate attention unless something changed or failed.
+
+The container checks deliberately include stopped declared services and exclude old Compose orphans. Inspect orphans separately during maintenance.
+
+## Verification
 
 ```bash
-sudo systemctl start docker-services-startup-check.service
-```
+cd ~/docker-services
 
----
+# Repository and deployment intent
+git status --short --branch
+./scripts/validate.sh
 
-### View logs
+# Declared services, including stopped containers but excluding orphans
+docker compose --env-file env/server01.env --profile apps \
+  ps --all --orphans=false
 
-```bash
+# Orphans and other historical containers
+docker compose --env-file env/server01.env --profile apps ps --all
+
+# Monitoring units
+systemctl status \
+  docker-services-startup-check.timer \
+  docker-services-monitor.timer \
+  docker-services-disk-check.timer \
+  docker-services-image-check.timer \
+  pihole-host-shim.service
+
 journalctl -u docker-services-monitor.service -n 50 --no-pager
 ```
 
----
+## Known operational gaps
 
-## 🚨 Alerting Model
+- `esphome` currently cannot start while `/dev/ttyACM0` is absent. Either restore the expected USB device/path or make local USB passthrough optional before restarting it.
+- A clean clone cannot recreate the full MQTT/Zigbee/Monkeytype stack: the Mosquitto password file, Zigbee2MQTT data/config, and Monkeytype Firebase service-account JSON have no complete encrypted-source/provisioning path.
+- `env/server01.env.example` does not currently define every variable required by Compose, including ESPHome and n8n settings, and its SearXNG hostname differs from the live Caddy route. Treat it as a starting point, not a sufficient deployment manifest.
+- The monitoring systemd units hard-code the `lightweight` account and `/home/lightweight/docker-services`; the installer is not portable to another checkout owner/path.
+- `image-check.sh` suppresses `docker compose pull --dry-run` errors and can therefore report “up to date” after a pull/auth/network failure.
+- The stopped orphaned `beszel` container should be removed after confirming no migration rollback depends on it.
+- Mutable data and live Home Assistant configuration remain ignored local state; off-host backup coverage must be verified independently.
+- Several images use floating tags such as `latest`, `stable`, or a broad version variable. This eases updates but weakens deterministic rebuilds; pin digests or tested versions where rollback certainty matters.
 
-### Local
+## Related repositories
 
-* container-level Discord webhook
+- [`linux-environments`](https://github.com/beardedsandworm/linux-environments) — host bootstrap, package snapshots, dotfiles, and host maintenance timers.
+- [`llm-services`](https://github.com/beardedsandworm/llm-services) — Hermes/LLM deployment on IX.
+- [`vps-services`](https://github.com/beardedsandworm/vps-services) — public VPS services on Heighliner.
+- [`wormlogic-gitops`](https://github.com/beardedsandworm/wormlogic-gitops) — Kubernetes/Talos/Flux work.
 
-### Centralized (n8n)
-
-* alerts-only channel 🚨
-* deduplicated
-* escalated
-* state-aware
-
----
-
-## 📊 Monitoring Philosophy
-
-### 🔕 Signal > Noise
-
-* suppression windows
-* escalation thresholds
-
-### 🧠 Event-Driven
-
-Everything is:
-
-```
-event → decision → action
-```
-
-### ♻️ System-Oriented
-
-This is not just monitoring—it is a **feedback loop**.
-
----
-
-## 🧯 What Breaks If Misconfigured?
-
-### 🌐 Caddy / DNS
-
-| Symptom | Likely Cause | Fix |
-|---|---|---|
-| Service does not load | hostname missing from internal DNS | add DNS record or wildcard |
-| Cert does not issue | Cloudflare token missing/invalid | verify Caddy env secret |
-| New route ignored | Caddy still using old config | `docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile` |
-
----
-
-### 🔐 Secrets
-
-| Symptom | Likely Cause | Fix |
-|---|---|---|
-| Compose warns variables are blank | env file not loaded | use `--env-file env/server01.env` |
-| Service starts but auth fails | decrypted runtime secret missing | run decrypt script |
-| n8n encryption error | key changed after first boot | preserve `N8N_ENCRYPTION_KEY` |
-
----
-
-### 🧠 n8n
-
-| Symptom | Likely Cause | Fix |
-|---|---|---|
-| Webhook returns 404 | workflow inactive or test URL expired | activate workflow and use `/webhook/events` |
-| Events arrive but no alert | suppressed or severity not alert-worthy | check Code output + IF node |
-| Alert IF always false | previous node replaced `$json` | reference `Code - Normalize Incident` directly |
-| Daily summary all zeroes | Code node wired to schedule instead of Postgres | connect `Schedule → Postgres → Code` only |
-
----
-
-### 🗄️ Postgres
-
-| Symptom | Likely Cause | Fix |
-|---|---|---|
-| n8n cannot connect | using `localhost` | use host `postgres` |
-| Table missing | schema not created | run SQL setup |
-| Active incident missing | upsert node not reached | check workflow execution path |
-| History empty | `incident_events` node not reached | verify it runs after incident upsert |
-
----
-
-### 📡 Monitoring
-
-| Symptom | Likely Cause | Fix |
-|---|---|---|
-| No n8n event from script | `N8N_EVENT_WEBHOOK_URL` missing | add runtime/env secret |
-| No Discord from systemd | service environment differs from shell | load env/secrets in script |
-| Systemd unit not found | user vs system unit mismatch | try `systemctl --user` |
-| Monitor sends nothing | no state change detected | force a container stop/start test |
-
----
-
-### 🐳 Docker Networking
-
-| Symptom | Likely Cause | Fix |
-|---|---|---|
-| n8n cannot reach Postgres | wrong host | use `postgres:5432` inside Docker network |
-| Host cannot reach Postgres | port intentionally not published | use `docker compose exec postgres psql ...` |
-| Container route fails through Caddy | service not on proxy network | attach service to Caddy network |
-
----
-
-## 📈 Future Direction
-
-* 🔁 auto-remediation workflows
-* 📊 dashboards (Grafana)
-* 📉 trend analysis
-* 🔐 improved secret management
-* 🚀 full self-deployment pipeline
-
----
-
-## ⚡ TL;DR
-
-```text
-Compose → Monitor → Emit → n8n → Store → Alert → Report
-
-linux-environments
-        │
-        ▼
-docker-services ──► emit-event.sh
-        │
-        ▼
-       n8n
-   (dedupe / logic)
-        │
-   ┌────┴────┐
-   ▼         ▼
-Postgres   Discord
-(state)    (alerts + reports)
-```
-
----
-
-## 🧭 Related
-
-* linux-environments → host bootstrap + system setup
-* n8n → automation + orchestration
-
----
-
-## 🧑‍💻 Author
+## Author
 
 Matthew Garry
-
----
-
-## 🪪 License
-
-MIT

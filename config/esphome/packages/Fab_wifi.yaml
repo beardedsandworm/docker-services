@@ -1,0 +1,7 @@
+wifi:
+  networks:
+    - ssid: !secret Fab_wifi_ssid
+      password: !secret Fab_wifi_password
+      hidden: true
+
+  power_save_mode: none

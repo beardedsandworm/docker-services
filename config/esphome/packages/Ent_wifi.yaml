@@ -1,0 +1,7 @@
+wifi:
+  networks:
+    - ssid: !secret Ent_wifi_ssid
+      password: !secret Ent_wifi_password
+      hidden: true
+
+  power_save_mode: none

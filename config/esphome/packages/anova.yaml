@@ -1,0 +1,10 @@
+ble_client:
+  - mac_address: "10:CE:A9:CB:BE:36"
+    id: anova_ble
+
+climate:
+  - platform: anova
+    name: "Anova Sous Vide"
+    id: anova_cooker
+    ble_client_id: anova_ble
+    unit_of_measurement: f

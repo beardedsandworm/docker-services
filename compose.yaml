@@ -85,7 +85,7 @@ services:
 
   postgres:
     container_name: postgres
-    image: postgres:latest
+    image: postgres:18
     restart: unless-stopped
 
     env_file:
@@ -185,8 +185,8 @@ services:
       - ./config/esphome:/config
       - ./runtime/server01/secrets/esphome-secrets.yaml:/config/secrets.yaml:ro
       - /etc/localtime:/etc/localtime:ro
-    devices:
-      - /dev/ttyACM0:/dev/ttyACM0
+#    devices:
+#      - /dev/ttyACM0:/dev/ttyACM0
     networks:
       - proxy_network
 
@@ -310,6 +310,27 @@ services:
 
     volumes:
       - ./config/matter-server/data:/data
+
+  omada:
+    image: mbentley/omada-controller:6.3
+    container_name: omada
+    network_mode: host
+    restart: unless-stopped
+    stop_grace_period: 60s
+
+    environment:
+      TZ: ${TZ}
+      SHOW_SERVER_LOGS: "true"
+      SHOW_MONGODB_LOGS: "false"
+
+    volumes:
+      - ./config/omada/data:/opt/tplink/EAPController/data
+      - ./config/omada/logs:/opt/tplink/EAPController/logs
+
+    ulimits:
+      nofile:
+        soft: 4096
+        hard: 8192
 
 secrets:
   pihole_web_password:
