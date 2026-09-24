@@ -42,7 +42,7 @@ pantry.wormlogic.com {
 
 esphome.wormlogic.com {
 	import dns_tls
-	reverse_proxy esphome:6052
+	reverse_proxy 10.42.20.4:6052
 }
 
 ix.wormlogic.com {
@@ -66,4 +66,19 @@ omada.wormlogic.com {
 ntopng.wormlogic.com {
         import dns_tls
         reverse_proxy http://10.42.10.1:3000
+}
+
+pihole1.wormlogic.com {
+    import dns_tls
+    reverse_proxy 10.42.20.10:80
+}
+
+pihole2.wormlogic.com {
+    import dns_tls
+    reverse_proxy 10.42.20.11:80
+}
+
+dashboard.wormlogic.com {
+    import dns_tls
+    reverse_proxy homepage:3000
 }

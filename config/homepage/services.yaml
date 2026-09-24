@@ -1,0 +1,114 @@
+- Today:
+    - Calendar:
+        widget:
+          type: calendar
+          view: monthly
+          firstDayInWeek: sunday
+          showTime: true
+          timezone: America/New_York
+          maxEvents: 10
+
+    - Daily:
+        icon: mdi-calendar-check
+        description: Tasks and reminders
+
+    - Feed:
+        icon: mdi-rss
+        description: News and notifications
+
+- Network:
+    - OPNsense:
+        icon: opnsense.png
+        href: https://midway.wormlogic.com
+        description: Router, firewall, and DHCP
+
+    - Pi-hole 1:
+        icon: pi-hole.png
+        href: https://pihole1.wormlogic.com/admin
+        description: Primary DNS
+
+    - Pi-hole 2:
+        icon: pi-hole.png
+        href: https://pihole2.wormlogic.com/admin
+        description: Secondary DNS
+        server: arrakis
+        container: pihole
+
+    - Omada Controller:
+        icon: omada.png
+        href: https://omada.wormlogic.com
+        description: Switches and port management
+        server: arrakis
+        container: omada
+
+    - ntopng:
+        icon: ntopng.png
+        href: https://ntopng.wormlogic.com
+        description: Traffic monitoring
+
+- Home Services:
+    - Home Assistant:
+        icon: home-assistant.png
+        href: https://ha.wormlogic.com
+        description: Home automation
+        server: arrakis
+        container: homeassistant
+
+    - Grocy:
+        icon: grocy.png
+        href: https://pantry.wormlogic.com
+        description: Household inventory
+        server: arrakis
+        container: grocy
+
+    - ESPHome:
+        icon: esphome.png
+        href: https://esphome.wormlogic.com
+        description: ESP device management
+        server: arrakis
+        container: esphome
+
+- Automation:
+    - n8n (Arrakis):
+        icon: n8n.png
+        href: https://automate.wormlogic.com
+        description: Workflow automation
+        server: arrakis
+        container: n8n
+
+    - n8n (Heighliner):
+        icon: n8n.png
+        href: https://ops.wormlogic.com
+        description: Agent automations
+        server: heighliner
+        container: n8n
+
+
+- Utilities:
+    - Hermes:
+        icon: hermes.png
+        href: https://ix.wormlogic.com/chat
+        description: Agent harness
+        server: ix
+        container: hermes
+
+    - Beszel:
+        icon: beszel.png
+        href: https://monitor.wormlogic.com
+        description: Hardware monitoring
+        server: heighliner
+        container: beszel
+
+    - SearXNG:
+        icon: searxng.png
+        href: https://search.wormlogic.com
+        description: Search
+        server: arrakis
+        container: searxng
+
+    - Monkeytype:
+        icon: monkeytype.png
+        href: https://type.wormlogic.com
+        description: Typing practice
+        server: arrakis
+        container: monkeytype-frontend

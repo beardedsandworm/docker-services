@@ -1,0 +1,25 @@
+title: "{~} wormlogic"
+description: Homelab services
+
+theme: dark
+color: purple
+
+headerStyle: clean
+statusStyle: dot
+
+useEqualHeights: true
+target: _blank
+
+disableIndexing: true
+
+maxBookmarkGroupColumns: 3
+
+layout:
+  Today:
+    style: row
+    columns: 3
+
+  Network:
+  Home Services:
+  Automation:
+  Utilities:

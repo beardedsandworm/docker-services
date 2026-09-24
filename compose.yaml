@@ -180,21 +180,20 @@ services:
     restart: unless-stopped
     environment:
       TZ: "${TZ}"
-      ESPHOME_DASHBOARD_USE_PING: "true"
+#      ESPHOME_DASHBOARD_USE_PING: "true"
     volumes:
       - ./config/esphome:/config
       - ./runtime/server01/secrets/esphome-secrets.yaml:/config/secrets.yaml:ro
       - /etc/localtime:/etc/localtime:ro
 #    devices:
 #      - /dev/ttyACM0:/dev/ttyACM0
-    networks:
-      - proxy_network
+    network_mode: host
 
   grocy:
     container_name: grocy
     image: lscr.io/linuxserver/grocy:latest
     restart: unless-stopped
-    profiles: ["apps"]
+#    profiles: ["apps"]
     environment:
       PUID: "${PUID}"
       PGID: "${PGID}"
@@ -208,7 +207,7 @@ services:
     container_name: monkeytype-mongodb
     image: mongo:latest
     restart: unless-stopped
-    profiles: ["apps"]
+#    profiles: ["apps"]
 
     volumes:
       - ./config/monkeytype/mongodb:/data/db
@@ -220,7 +219,7 @@ services:
     container_name: monkeytype-redis
     image: redis:latest
     restart: unless-stopped
-    profiles: ["apps"]
+#    profiles: ["apps"]
 
     volumes:
       - ./config/monkeytype/redis:/data
@@ -232,7 +231,7 @@ services:
     container_name: monkeytype-backend
     image: monkeytype/monkeytype-backend:latest
     restart: unless-stopped
-    profiles: ["apps"]
+#    profiles: ["apps"]
 
     depends_on:
       - monkeytype-mongodb
@@ -260,7 +259,7 @@ services:
     container_name: monkeytype-frontend
     image: monkeytype/monkeytype-frontend:latest
     restart: unless-stopped
-    profiles: ["apps"]
+#    profiles: ["apps"]
 
     depends_on:
       - monkeytype-backend
@@ -332,6 +331,45 @@ services:
         soft: 4096
         hard: 8192
 
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    restart: unless-stopped
+    environment:
+      HOMEPAGE_ALLOWED_HOSTS: dashboard.wormlogic.com
+      LOG_TARGETS: stdout
+    volumes:
+      - ./config/homepage:/app/config
+      - ./config/homepage/icons:/app/public/icons:ro
+    networks:
+      - proxy_network
+      - homepage_docker
+
+  homepage-docker-proxy:
+    image: lscr.io/linuxserver/socket-proxy:latest
+    container_name: homepage-docker-proxy
+    restart: unless-stopped
+    environment:
+      CONTAINERS: 1
+      POST: 0
+      ALLOW_ARCHIVE: 0
+      ALLOW_CHANGES: 0
+      ALLOW_EXPORT: 0
+      ALLOW_LOGS: 0
+      ALLOW_TOP: 0
+      ALLOW_START: 0
+      ALLOW_STOP: 0
+      ALLOW_RESTARTS: 0
+      ALLOW_PAUSE: 0
+      ALLOW_UNPAUSE: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - homepage_docker
+    read_only: true
+    tmpfs:
+      - /run
+
 secrets:
   pihole_web_password:
     file: ./runtime/server01/secrets/pihole_web_password.txt
@@ -350,3 +388,6 @@ networks:
 
   proxy_network:
     driver: bridge
+
+  homepage_docker:
+    internal: true

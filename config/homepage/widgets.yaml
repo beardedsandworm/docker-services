@@ -1,0 +1,19 @@
+- search:
+    provider: custom
+    url: https://search.wormlogic.com/search?q=
+    target: _blank
+
+- datetime:
+    text_size: xl
+    format:
+      dateStyle: short
+      timeStyle: short
+      hour12: true
+
+- openmeteo:
+    label: Home
+    latitude: 42.75534709376399
+    longitude: -71.8518852373178
+    timezone: America/New_York
+    units: imperial
+    cache: 10

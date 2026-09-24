@@ -1,0 +1,130 @@
+- Daily:
+    - Fastmail:
+        - icon: fastmail.png
+          href: https://app.fastmail.com/mail/
+          description: Mail
+
+    - GitHub:
+        - icon: github.png
+          href: https://github.com/
+          description: Repositories and projects
+
+    - Cloudflare:
+        - icon: cloudflare.png
+          href: https://dash.cloudflare.com/
+          description: DNS and domains
+
+    - Proton VPN:
+        - icon: proton.png
+          href: https://account.proton.me/
+          description: VPN account
+
+
+- Infrastructure:
+    - OPNsense Docs:
+        - icon: opnsense.png
+          href: https://docs.opnsense.org/
+          description: Midway reference
+
+    - Caddy Docs:
+        - icon: caddy.png
+          href: https://caddyserver.com/docs/
+          description: Proxy and TLS reference
+
+    - Docker Hub:
+        - icon: docker.png
+          href: https://hub.docker.com/
+          description: Container images
+
+    - LinuxServer.io:
+        - icon: https://docs.linuxserver.io/assets/icon.svg
+          href: https://docs.linuxserver.io/
+          description: Container documentation
+
+
+- Home Automation:
+    - Home Assistant:
+        - icon: home-assistant.png
+          href: https://www.home-assistant.io/integrations/
+          description: Integration documentation
+
+    - ESPHome:
+        - icon: esphome.png
+          href: https://esphome.io/
+          description: Components and configuration
+
+    - Zigbee2MQTT:
+        - icon: zigbee2mqtt.png
+          href: https://www.zigbee2mqtt.io/
+          description: Zigbee devices and configuration
+
+    - Device Database:
+        - icon: zigbee2mqtt.png
+          href: https://www.zigbee2mqtt.io/supported-devices/
+          description: Zigbee compatibility lookup
+
+
+- Cluster:
+    - Kubernetes:
+        - icon: kubernetes.png
+          href: https://kubernetes.io/docs/
+          description: Kubernetes documentation
+
+    - Talos:
+        - icon: talos.png
+          href: https://docs.siderolabs.com/talos/
+          description: Shai-Hulud operating system
+
+    - Flux:
+        - icon: /icons/flux.svg
+          href: https://fluxcd.io/flux/
+          description: GitOps documentation
+
+    - Rook:
+        - icon: /icons/rook.svg
+          href: https://rook.io/docs/rook/latest-release/
+          description: Ceph and storage reference
+
+
+- Media:
+    - TRaSH Guides:
+        - icon: https://trash-guides.info/img/logo.png
+          href: https://trash-guides.info/
+          description: Servarr configuration reference
+
+    - TheTVDB:
+        - icon: https://thetvdb.com/images/logo.svg
+          href: https://thetvdb.com/
+          description: Television metadata
+
+    - TMDB:
+        - icon: https://www.themoviedb.org/assets/v4/logos/v2/blue_short-8e7b30f73a4020692ccca9c88bafe5dcb6f8a62a4c6bc55cd9ba82bb2cd95f6c.svg
+          href: https://www.themoviedb.org/
+          description: Movie and television metadata
+
+    - Plex Support:
+        - icon: plex.png
+          href: https://support.plex.tv/
+          description: Plex documentation
+
+
+- Toolbox:
+    - Internet Archive:
+        - icon: /icons/internet_archive.svg
+          href: https://archive.org/
+          description: Software, media and history
+
+    - VirusTotal:
+        - icon: /icons/virustotal.svg
+          href: https://www.virustotal.com/
+          description: URL and file inspection
+
+    - MXToolbox:
+        - icon: https://images.mxtoolbox.com/public/images/logo.png
+          href: https://mxtoolbox.com/SuperTool.aspx
+          description: DNS and mail diagnostics
+
+    - SSL Labs:
+        - icon: https://www.ssllabs.com/images/qualys-ssl-labs-logo.png
+          href: https://www.ssllabs.com/ssltest/
+          description: TLS testing

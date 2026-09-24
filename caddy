@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cmd="${1:-}"
+
+case "$cmd" in
+  validate)
+    ./dc exec caddy sh -c \
+      'export CLOUDFLARE_API_TOKEN="$(cat /run/secrets/cloudflare_api_token)"; caddy validate --config /etc/caddy/Caddyfile'
+    ;;
+
+  reload)
+    ./dc exec caddy sh -c \
+      'export CLOUDFLARE_API_TOKEN="$(cat /run/secrets/cloudflare_api_token)"; caddy reload --config /etc/caddy/Caddyfile'
+    ;;
+
+  *)
+    echo "Usage: ./caddy {validate|reload}" >&2
+    exit 2
+    ;;
+esac

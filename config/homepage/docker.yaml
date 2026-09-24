@@ -1,0 +1,11 @@
+arrakis:
+  host: homepage-docker-proxy
+  port: 2375
+
+ix:
+  host: 10.42.20.5
+  port: 2375
+
+heighliner:
+  host: 10.8.0.1
+  port: 2375
