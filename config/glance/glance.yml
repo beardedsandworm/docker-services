@@ -1,0 +1,113 @@
+server:
+  assets-path: /app/assets
+  proxied: true
+
+theme:
+  custom-css-file: /assets/embed.css
+
+document:
+  head: |
+    <script>
+      if (window.location.pathname.startsWith("/embed")) {
+        document.documentElement.classList.add("homepage-embed");
+      }
+    </script>
+
+pages:
+  - name: News
+    slug: news
+    width: wide
+    hide-desktop-navigation: true
+    columns:
+      - size: full
+        widgets:
+          - type: rss
+            title: Tech
+            style: detailed-list
+            limit: 30
+            collapse-after: 10
+            cache: 15m
+            feeds:
+              - url: https://feeds.arstechnica.com/arstechnica/index
+                title: Ars Technica
+                limit: 10
+
+              - url: https://www.servethehome.com/feed/
+                title: ServeTheHome
+                limit: 10
+
+              - url: https://www.404media.co/rss/
+                title: 404 Media
+                limit: 10
+
+              - url: https://selfh.st/rss/
+                title: selfh.st
+                limit: 10
+
+          - type: rss
+            title: General News
+            style: detailed-list
+            limit: 30
+            collapse-after: 10
+            cache: 15m
+            feeds:
+              - url: https://feeds.npr.org/1001/rss.xml
+                title: NPR
+                limit: 10
+
+              - url: https://www.pbs.org/newshour/feeds/rss/headlines
+                title: PBS News
+                limit: 10
+
+              - url: https://feeds.bbci.co.uk/news/world/rss.xml
+                title: BBC World
+                limit: 10
+
+  - name: Embed
+    slug: embed
+    hide-desktop-navigation: true
+    show-mobile-header: false
+    columns:
+      - size: full
+        widgets:
+          - type: rss
+            hide-header: true
+            limit: 8
+            collapse-after: -1
+            cache: 15m
+            single-line-titles: true
+            feeds:
+              - url: https://feeds.arstechnica.com/arstechnica/index
+                title: Ars Technica
+                limit: 4
+
+              - url: https://www.servethehome.com/feed/
+                title: ServeTheHome
+                limit: 4
+
+              - url: https://www.404media.co/rss/
+                title: 404 Media
+                limit: 4
+
+              - url: https://selfh.st/rss/
+                title: selfh.st
+                limit: 4
+
+          - type: rss
+            hide-header: true
+            limit: 5
+            collapse-after: -1
+            cache: 15m
+            single-line-titles: true
+            feeds:
+              - url: https://feeds.npr.org/1001/rss.xml
+                title: NPR
+                limit: 3
+
+              - url: https://www.pbs.org/newshour/feeds/rss/headlines
+                title: PBS News
+                limit: 3
+
+              - url: https://feeds.bbci.co.uk/news/world/rss.xml
+                title: BBC World
+                limit: 3

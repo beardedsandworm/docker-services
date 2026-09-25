@@ -1,3 +1,32 @@
+html,
+body,
+#__next,
+#page_wrapper,
+#inner_wrapper {
+  background-color: #111018 !important;
+}
+
+.service-card,
+.bookmark-icon,
+.bookmark-text {
+  background-color: rgba(126, 34, 206, 0.22) !important;
+}
+
 .bookmark-group {
   flex-basis: 33.333333% !important;
+}
+
+@media (min-width: 1024px) {
+  #services {
+    display: grid !important;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    align-items: start;
+  }
+
+  #services > .services-group {
+    min-width: 0;
+    width: auto !important;
+    max-width: none !important;
+    flex: none !important;
+  }
 }

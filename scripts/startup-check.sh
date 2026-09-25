@@ -70,15 +70,25 @@ fi
 cd "${REPO_ROOT}"
 
 log_step "Validating docker-compose configuration..."
-docker compose --env-file "${ENV_FILE}" --profile apps config >/dev/null
+"${REPO_ROOT}/dc" --profile apps config >/dev/null
 log_success "docker-compose configuration is valid"
 
 log_step "Checking service state..."
 status_lines="$(
-  docker compose --env-file "${ENV_FILE}" --profile apps ps --all --orphans=false --format json \
+  "${REPO_ROOT}/dc" --profile apps ps --all --orphans=false --format json \
   | jq -r '
       if type == "array" then .[] else . end
-      | "\(.Name // .Service // "unknown")\t\(.State // .Status // "unknown")\t\(.Health // "none")"
+      | [
+          (.Name // .Service // "unknown"),
+          (.State // .Status // "unknown"),
+          (
+            if (.Health // "") == ""
+            then "none"
+            else .Health
+            end
+          )
+        ]
+      | @tsv
     '
 )"
 

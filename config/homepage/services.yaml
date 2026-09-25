@@ -7,14 +7,25 @@
           showTime: true
           timezone: America/New_York
           maxEvents: 10
+          integrations:
+            - type: ical
+              url: "{{HOMEPAGE_FILE_FASTMAIL_ICAL}}"
+              name: Personal
+              color: purple
 
     - Daily:
         icon: mdi-calendar-check
         description: Tasks and reminders
 
-    - Feed:
+    - News:
         icon: mdi-rss
-        description: News and notifications
+        href: https://glance.wormlogic.com/news
+        widget:
+          type: iframe
+          name: News
+          src: https://glance.wormlogic.com/embed
+          classes: h-72
+          allowScrolling: yes
 
 - Network:
     - OPNsense:
@@ -40,11 +51,6 @@
         description: Switches and port management
         server: arrakis
         container: omada
-
-    - ntopng:
-        icon: ntopng.png
-        href: https://ntopng.wormlogic.com
-        description: Traffic monitoring
 
 - Home Services:
     - Home Assistant:
@@ -92,13 +98,6 @@
         server: ix
         container: hermes
 
-    - Beszel:
-        icon: beszel.png
-        href: https://monitor.wormlogic.com
-        description: Hardware monitoring
-        server: heighliner
-        container: beszel
-
     - SearXNG:
         icon: searxng.png
         href: https://search.wormlogic.com
@@ -112,3 +111,16 @@
         description: Typing practice
         server: arrakis
         container: monkeytype-frontend
+
+- Monitoring:
+    - Beszel:
+        icon: beszel.png
+        href: https://monitor.wormlogic.com
+        description: Hardware monitoring
+        server: heighliner
+        container: beszel
+
+    - ntopng:
+        icon: ntopng.png
+        href: https://ntopng.wormlogic.com
+        description: Traffic monitoring

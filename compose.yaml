@@ -338,9 +338,11 @@ services:
     environment:
       HOMEPAGE_ALLOWED_HOSTS: dashboard.wormlogic.com
       LOG_TARGETS: stdout
+      HOMEPAGE_FILE_FASTMAIL_ICAL: /run/secrets/homepage-fastmail-ical.txt
     volumes:
       - ./config/homepage:/app/config
       - ./config/homepage/icons:/app/public/icons:ro
+      - ./runtime/server01/secrets/homepage-fastmail-ical.txt:/run/secrets/homepage-fastmail-ical.txt:ro
     networks:
       - proxy_network
       - homepage_docker
@@ -369,6 +371,16 @@ services:
     read_only: true
     tmpfs:
       - /run
+
+  glance:
+    image: glanceapp/glance:v0.8.6
+    container_name: glance
+    restart: unless-stopped
+    volumes:
+      - ./config/glance:/app/config
+      - ./config/glance/assets:/app/assets:ro
+    networks:
+      - proxy_network
 
 secrets:
   pihole_web_password:

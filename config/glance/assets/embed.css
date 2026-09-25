@@ -1,0 +1,14 @@
+html.homepage-embed,
+html.homepage-embed body,
+html.homepage-embed main,
+html.homepage-embed .page,
+html.homepage-embed .page-content,
+html.homepage-embed .widget-content-frame {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+html.homepage-embed .widget-content-frame {
+  border-color: transparent !important;
+  box-shadow: none !important;
+}

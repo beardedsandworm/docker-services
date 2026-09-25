@@ -12,14 +12,12 @@ target: _blank
 
 disableIndexing: true
 
+fullWidth: true
+maxGroupColumns: 6
+
 maxBookmarkGroupColumns: 3
 
 layout:
   Today:
     style: row
     columns: 3
-
-  Network:
-  Home Services:
-  Automation:
-  Utilities:

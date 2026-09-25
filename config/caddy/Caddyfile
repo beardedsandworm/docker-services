@@ -82,3 +82,8 @@ dashboard.wormlogic.com {
     import dns_tls
     reverse_proxy homepage:3000
 }
+
+glance.wormlogic.com {
+    import dns_tls
+    reverse_proxy glance:8080
+}

@@ -80,13 +80,18 @@ fi
 
 cd "${REPO_ROOT}"
 
-docker compose --env-file "${ENV_FILE}" --profile apps ps --all --orphans=false --format json \
+"${REPO_ROOT}/dc" ps --all --orphans=false --format json \
   | jq -r '
       if type == "array" then .[] else . end
       | [
           (.Name // .Service // "unknown"),
           (.State // .Status // "unknown"),
-          (.Health // "none")
+          (
+            if (.Health // "") == ""
+            then "none"
+            else .Health
+            end
+          )
         ]
       | @tsv
     ' \

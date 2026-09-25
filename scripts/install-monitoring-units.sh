@@ -161,8 +161,6 @@ main() {
   require_file "${SYSTEMD_DIR}/docker-services-monitor.timer"
   require_file "${SYSTEMD_DIR}/docker-services-startup-check.service"
   require_file "${SYSTEMD_DIR}/docker-services-startup-check.timer"
-  require_file "${SYSTEMD_DIR}/docker-services-disk-check.service"
-  require_file "${SYSTEMD_DIR}/docker-services-disk-check.timer"
   require_file "${SYSTEMD_DIR}/docker-services-image-check.service"
   require_file "${SYSTEMD_DIR}/docker-services-image-check.timer"
 
@@ -174,8 +172,6 @@ main() {
   install_unit "docker-services-monitor.timer"
   install_unit "docker-services-startup-check.service"
   install_unit "docker-services-startup-check.timer"
-  install_unit "docker-services-disk-check.service"
-  install_unit "docker-services-disk-check.timer"
   install_unit "docker-services-image-check.service"
   install_unit "docker-services-image-check.timer"
 
@@ -186,20 +182,17 @@ main() {
   log_step "Enabling timers..."
   sudo systemctl enable --now docker-services-monitor.timer
   sudo systemctl enable --now docker-services-startup-check.timer
-  sudo systemctl enable --now docker-services-disk-check.timer
   sudo systemctl enable --now docker-services-image-check.timer
   log_success "Monitoring timers enabled"
 
   run_smoke_test "docker-services-monitor.service"
   run_smoke_test "docker-services-startup-check.service"
-  run_smoke_test "docker-services-disk-check.service"
   run_smoke_test "docker-services-image-check.service"
 
   echo
   log_success "Monitoring timers installed and tested:"
   sudo systemctl status docker-services-monitor.timer --no-pager
   sudo systemctl status docker-services-startup-check.timer --no-pager
-  sudo systemctl status docker-services-disk-check.timer --no-pager
   sudo systemctl status docker-services-image-check.timer --no-pager
 
   INSTALL_SUCCEEDED="true"
