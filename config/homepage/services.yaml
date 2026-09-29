@@ -74,21 +74,36 @@
         server: arrakis
         container: esphome
 
-- Automation:
-    - n8n (Arrakis):
-        icon: n8n.png
-        href: https://automate.wormlogic.com
-        description: Workflow automation
-        server: arrakis
-        container: n8n
+- Media:
+    - Plex:
+        icon: plex.png
+        href: https://plex.wormlogic.com/web
+        description: Media server
 
-    - n8n (Heighliner):
-        icon: n8n.png
-        href: https://ops.wormlogic.com
-        description: Agent automations
-        server: heighliner
-        container: n8n
+    - Emby:
+        icon: emby.png
+        href: https://emby.wormlogic.com
+        description: Media server
 
+    - Sonarr:
+        icon: sonarr.png
+        href: https://sonarr.wormlogic.com
+        description: TV management
+
+    - Radarr:
+        icon: radarr.png
+        href: https://radarr.wormlogic.com
+        description: Movie management
+
+#    - Stash:
+#        icon: stash.png
+#        href: https://stash.wormlogic.com
+#        description: Stuff server
+
+#    - Whisparr:
+#        icon: whisparr.png
+#        href: https://whisparr.wormlogic.com
+#        description: Stuff management
 
 - Utilities:
     - Hermes:
@@ -112,7 +127,17 @@
         server: arrakis
         container: monkeytype-frontend
 
-- Monitoring:
+    - Prowlarr:
+        icon: prowlarr.png
+        href: https://prowlarr.wormlogic.com
+        description: Indexer management
+
+    - qBittorrent:
+        icon: qbittorrent.png
+        href: https://qbittorrent.wormlogic.com
+        description: Downloads
+
+- Monitoring and Automation:
     - Beszel:
         icon: beszel.png
         href: https://monitor.wormlogic.com
@@ -124,3 +149,17 @@
         icon: ntopng.png
         href: https://ntopng.wormlogic.com
         description: Traffic monitoring
+
+    - n8n (Arrakis):
+        icon: n8n.png
+        href: https://automate.wormlogic.com
+        description: Workflow automation
+        server: arrakis
+        container: n8n
+
+    - n8n (Heighliner):
+        icon: n8n.png
+        href: https://ops.wormlogic.com
+        description: Agent automations
+        server: heighliner
+        container: n8n

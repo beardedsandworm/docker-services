@@ -87,3 +87,43 @@ glance.wormlogic.com {
     import dns_tls
     reverse_proxy glance:8080
 }
+
+plex.wormlogic.com {
+    import dns_tls
+    reverse_proxy 10.42.42.3:32400
+}
+
+sonarr.wormlogic.com {
+    import dns_tls
+    reverse_proxy 10.42.42.3:8989
+}
+
+radarr.wormlogic.com {
+    import dns_tls
+    reverse_proxy 10.42.42.3:7878
+}
+
+whisparr.wormlogic.com {
+    import dns_tls
+    reverse_proxy 10.42.42.3:6969
+}
+
+prowlarr.wormlogic.com {
+    import dns_tls
+    reverse_proxy 10.42.42.3:9696
+}
+
+emby.wormlogic.com {
+    import dns_tls
+    reverse_proxy 10.42.42.3:8096
+}
+
+qbittorrent.wormlogic.com {
+    import dns_tls
+    reverse_proxy 10.42.42.3:8080
+}
+
+stash.wormlogic.com {
+    import dns_tls
+    reverse_proxy 10.42.42.3:9999
+}
