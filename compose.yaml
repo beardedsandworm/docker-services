@@ -382,11 +382,46 @@ services:
     networks:
       - proxy_network
 
+  nextcloud:
+    image: nextcloud:production-apache
+    container_name: nextcloud
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nextcloud-redis:
+        condition: service_started
+    environment:
+      TZ: ${TZ}
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: nextcloud
+      POSTGRES_USER: nextcloud
+      POSTGRES_PASSWORD_FILE: /run/secrets/nextcloud_db_password.txt
+      REDIS_HOST: nextcloud-redis
+      NEXTCLOUD_TRUSTED_DOMAINS: cloud.wormlogic.com
+      OVERWRITEPROTOCOL: https
+      OVERWRITECLIURL: https://cloud.wormlogic.com
+    secrets:
+      - nextcloud_db_password
+    volumes:
+      - ./config/nextcloud:/var/www/html
+    networks:
+      - proxy_network
+
+  nextcloud-redis:
+    image: redis:alpine
+    container_name: nextcloud-redis
+    restart: unless-stopped
+    networks:
+      - proxy_network
+
 secrets:
   pihole_web_password:
     file: ./runtime/server01/secrets/pihole_web_password.txt
   cloudflare_api_token:
     file: ./runtime/server01/secrets/cloudflare_api_token.txt
+  nextcloud_db_password:
+    file: ./runtime/server01/secrets/nextcloud_db_password.txt
 
 networks:
   home_network:

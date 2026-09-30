@@ -3,16 +3,10 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
-MACHINE_ID="${MACHINE_ID:-server01}"
-ENV_FILE="${REPO_ROOT}/env/${MACHINE_ID}.env"
+MACHINE_ID="${MACHINE_ID:-$(hostname -s)}"
 
 # shellcheck source=/dev/null
 source "${SCRIPT_DIR}/lib/notify-discord.sh"
-
-if [[ ! -f "${ENV_FILE}" ]]; then
-  echo "[ERROR] Missing ${ENV_FILE}"
-  exit 1
-fi
 
 for cmd in docker jq; do
   if ! command -v "${cmd}" >/dev/null 2>&1; then
@@ -26,12 +20,15 @@ if ! docker buildx version >/dev/null 2>&1; then
   exit 1
 fi
 
+if [[ ! -x "${REPO_ROOT}/dc" ]]; then
+  echo "[ERROR] Missing executable Compose wrapper: ${REPO_ROOT}/dc"
+  exit 1
+fi
+
 cd "${REPO_ROOT}"
 
 COMPOSE=(
-  docker compose
-  --env-file "${ENV_FILE}"
-  --profile apps
+  "${REPO_ROOT}/dc"
 )
 
 send_check_error() {
@@ -59,17 +56,47 @@ if ! CONFIG_JSON="$("${COMPOSE[@]}" config --format json)"; then
   exit 1
 fi
 
+if ! SERVICE_ROWS="$(
+  jq -r '
+    .services
+    | to_entries[]
+    | [
+        .key,
+        (if .value.build != null then "true" else "false" end),
+        (.value.image // "")
+      ]
+    | @tsv
+  ' <<<"${CONFIG_JSON}"
+)"; then
+  MESSAGE="Unable to parse Docker Compose services for ${MACHINE_ID}"
+
+  echo "[ERROR] ${MESSAGE}"
+  send_check_error "Image Check Failed" "${MESSAGE}"
+  exit 1
+fi
+
 UPDATED_SERVICES=()
 CHECK_ERRORS=()
 PINNED_SERVICES=()
+LOCAL_BUILD_SERVICES=()
 
 TOTAL_COUNT=0
 CHECKED_COUNT=0
 
-while IFS=$'\t' read -r SERVICE IMAGE; do
-  [[ -n "${SERVICE}" && -n "${IMAGE}" ]] || continue
+while IFS=$'\t' read -r SERVICE BUILD IMAGE; do
+  [[ -n "${SERVICE}" ]] || continue
 
   ((TOTAL_COUNT += 1))
+
+  # Services with a Compose build section are locally built.
+  # Examples: custom Caddy images and Hermes.
+  if [[ "${BUILD}" == "true" ]]; then
+    LOCAL_BUILD_SERVICES+=("${SERVICE}")
+    continue
+  fi
+
+  # Ignore services with neither a build nor an image.
+  [[ -n "${IMAGE}" ]] || continue
 
   # Immutable digest-pinned references do not need remote tag checks.
   if [[ "${IMAGE}" == *@sha256:* ]]; then
@@ -117,18 +144,15 @@ while IFS=$'\t' read -r SERVICE IMAGE; do
     continue
   fi
 
-  # If a new image has already been pulled but the container hasn't been
-  # recreated, we already know an update is pending. No registry query needed.
+  # If a newer image has already been pulled but the container has not been
+  # recreated, an update is already pending and no registry lookup is needed.
   if [[ "${RUNNING_IMAGE_ID}" != "${LOCAL_TAG_IMAGE_ID}" ]]; then
     ((CHECKED_COUNT += 1))
     UPDATED_SERVICES+=("${SERVICE}")
     continue
   fi
 
-  # Ask Buildx directly for the immutable digest of the configured tag.
-  #
-  # Wrapping the requested field in json is intentional; Buildx has
-  # historically handled formatted Manifest fields more consistently this way.
+  # Ask Buildx for the immutable digest of the configured remote tag.
   if ! REMOTE_OUTPUT="$(
     docker buildx imagetools inspect \
       "${IMAGE}" \
@@ -188,19 +212,33 @@ while IFS=$'\t' read -r SERVICE IMAGE; do
     UPDATED_SERVICES+=("${SERVICE}")
   fi
 
-done < <(
-  jq -r '
-    .services
-    | to_entries[]
-    | select(.value.image != null)
-    | [.key, .value.image]
-    | @tsv
-  ' <<<"${CONFIG_JSON}"
-)
+done <<<"${SERVICE_ROWS}"
 
 UPDATE_COUNT="${#UPDATED_SERVICES[@]}"
 ERROR_COUNT="${#CHECK_ERRORS[@]}"
 PINNED_COUNT="${#PINNED_SERVICES[@]}"
+LOCAL_BUILD_COUNT="${#LOCAL_BUILD_SERVICES[@]}"
+
+LOCAL_BUILD_SECTION=""
+
+if (( LOCAL_BUILD_COUNT > 0 )); then
+  LOCAL_BUILD_LIST="$(
+    printf '• %s\n' "${LOCAL_BUILD_SERVICES[@]}" \
+      | head -n 15
+  )"
+
+  if (( LOCAL_BUILD_COUNT > 15 )); then
+    LOCAL_BUILD_LIST+=$'\n'"• …and $((LOCAL_BUILD_COUNT - 15)) more"
+  fi
+
+  LOCAL_BUILD_SECTION=$(cat <<EOF
+
+Locally built images skipped: ${LOCAL_BUILD_COUNT}
+
+${LOCAL_BUILD_LIST}
+EOF
+)
+fi
 
 if (( ERROR_COUNT > 0 )); then
   ERROR_LIST="$(
@@ -213,12 +251,13 @@ if (( ERROR_COUNT > 0 )); then
   fi
 
   MESSAGE=$(cat <<EOF
-Image update check could not complete cleanly.
+Image update check could not complete cleanly on ${MACHINE_ID}.
 
 Image services found: ${TOTAL_COUNT}
 Images checked successfully: ${CHECKED_COUNT}
 Check errors: ${ERROR_COUNT}
 Pinned images skipped: ${PINNED_COUNT}
+${LOCAL_BUILD_SECTION}
 
 ${ERROR_LIST}
 EOF
@@ -244,11 +283,12 @@ if (( UPDATE_COUNT > 0 )); then
   fi
 
   MESSAGE=$(cat <<EOF
-Image updates available
+Image updates available on ${MACHINE_ID}
 
 Images checked: ${CHECKED_COUNT}
 Running containers with image updates: ${UPDATE_COUNT}
 Pinned images skipped: ${PINNED_COUNT}
+${LOCAL_BUILD_SECTION}
 
 ${SERVICE_LIST}
 EOF
@@ -265,9 +305,10 @@ EOF
 fi
 
 MESSAGE=$(cat <<EOF
-All ${CHECKED_COUNT} checked container images are up to date
+All ${CHECKED_COUNT} checked container images are up to date on ${MACHINE_ID}
 
 Pinned images skipped: ${PINNED_COUNT}
+${LOCAL_BUILD_SECTION}
 EOF
 )
 

@@ -1,18 +1,37 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DOCKER_SERVICES_WEBHOOK_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/docker-services/discord-webhook"
-DOTFILES_WEBHOOK_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles/discord-webhook"
-HOMELAB_WEBHOOK_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/homelab/discord-webhook"
+NOTIFY_SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+NOTIFY_REPO_ROOT="$(cd -- "${NOTIFY_SCRIPT_DIR}/../.." && pwd)"
+
+PROJECT_NAME="${PROJECT_NAME:-$(basename "${NOTIFY_REPO_ROOT}")}"
+
+# docker-services -> DOCKER_SERVICES
+# llm-services    -> LLM_SERVICES
+# vps-services    -> VPS_SERVICES
+PROJECT_ENV_PREFIX="$(
+  printf '%s' "${PROJECT_NAME}" \
+    | tr '[:lower:]-' '[:upper:]_'
+)"
+
+PROJECT_WEBHOOK_VAR="${PROJECT_ENV_PREFIX}_DISCORD_WEBHOOK_URL"
+
+CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+
+PROJECT_WEBHOOK_FILE="${CONFIG_HOME}/${PROJECT_NAME}/discord-webhook"
+DOTFILES_WEBHOOK_FILE="${CONFIG_HOME}/dotfiles/discord-webhook"
+HOMELAB_WEBHOOK_FILE="${CONFIG_HOME}/homelab/discord-webhook"
 
 get_discord_webhook() {
-  if [[ -n "${DOCKER_SERVICES_DISCORD_WEBHOOK_URL:-}" ]]; then
-    printf '%s\n' "${DOCKER_SERVICES_DISCORD_WEBHOOK_URL}"
+  local project_webhook="${!PROJECT_WEBHOOK_VAR:-}"
+
+  if [[ -n "${project_webhook}" ]]; then
+    printf '%s\n' "${project_webhook}"
     return 0
   fi
 
-  if [[ -f "${DOCKER_SERVICES_WEBHOOK_FILE}" ]]; then
-    cat "${DOCKER_SERVICES_WEBHOOK_FILE}"
+  if [[ -f "${PROJECT_WEBHOOK_FILE}" ]]; then
+    cat "${PROJECT_WEBHOOK_FILE}"
     return 0
   fi
 
@@ -41,16 +60,22 @@ json_escape() {
 }
 
 normalize_username() {
-  local username="${1:-docker-services}"
+  local username="${1:-${PROJECT_NAME}}"
+
   username="$(printf '%s' "${username}" | xargs)"
-  [[ -z "${username}" ]] && username="docker-services"
+
+  if [[ -z "${username}" ]]; then
+    username="${PROJECT_NAME}"
+  fi
+
   printf '%s\n' "${username}"
 }
 
 normalize_message() {
   local message="${1:-}"
-  # Convert literal "\n" sequences into real newlines for Discord readability.
+
   message="${message//\\n/$'\n'}"
+
   printf '%s' "${message}"
 }
 
@@ -58,19 +83,39 @@ build_discord_embed_payload() {
   local title="${1}"
   local description="${2}"
   local color="${3}"
-  local username="${4:-docker-services}"
-  local hostname="${HOSTNAME:-$(hostname)}"
-  local machine="${MACHINE_ID:-server01}"
+  local username="${4:-${PROJECT_NAME}}"
+
+  local hostname="${HOSTNAME:-$(hostname -s)}"
+  local machine="${MACHINE_ID:-${hostname}}"
 
   username="$(normalize_username "${username}")"
   description="$(normalize_message "${description}")"
 
-  local title_escaped description_escaped username_escaped hostname_escaped machine_escaped
-  title_escaped="$(printf '%s' "${title}" | json_escape)"
-  description_escaped="$(printf '%s' "${description}" | json_escape)"
-  username_escaped="$(printf '%s' "${username}" | json_escape)"
-  hostname_escaped="$(printf '%s' "${hostname}" | json_escape)"
-  machine_escaped="$(printf '%s' "${machine}" | json_escape)"
+  local title_escaped
+  local description_escaped
+  local username_escaped
+  local hostname_escaped
+  local machine_escaped
+
+  title_escaped="$(
+    printf '%s' "${title}" | json_escape
+  )"
+
+  description_escaped="$(
+    printf '%s' "${description}" | json_escape
+  )"
+
+  username_escaped="$(
+    printf '%s' "${username}" | json_escape
+  )"
+
+  hostname_escaped="$(
+    printf '%s' "${hostname}" | json_escape
+  )"
+
+  machine_escaped="$(
+    printf '%s' "${machine}" | json_escape
+  )"
 
   cat <<EOF
 {
@@ -81,8 +126,16 @@ build_discord_embed_payload() {
       "description": "${description_escaped}",
       "color": ${color},
       "fields": [
-        { "name": "Machine", "value": "${machine_escaped}", "inline": true },
-        { "name": "Host", "value": "${hostname_escaped}", "inline": true }
+        {
+          "name": "Machine",
+          "value": "${machine_escaped}",
+          "inline": true
+        },
+        {
+          "name": "Host",
+          "value": "${hostname_escaped}",
+          "inline": true
+        }
       ]
     }
   ]
@@ -95,23 +148,38 @@ send_discord_payload() {
   local webhook_url
 
   if ! webhook_url="$(get_discord_webhook)"; then
-    echo "[WARN] No Discord webhook configured" >&2
+    echo "[WARN] No Discord webhook configured for ${PROJECT_NAME}" >&2
     return 0
   fi
 
-  local response http_code body
-  response="$(curl -sS -w $'\n%{http_code}' \
-    -H "Content-Type: application/json" \
-    -X POST \
-    -d "${payload}" \
-    "${webhook_url}" || true)"
+  local response
+  local http_code
+  local body
+
+  response="$(
+    curl -sS \
+      -w $'\n%{http_code}' \
+      -H "Content-Type: application/json" \
+      -X POST \
+      -d "${payload}" \
+      "${webhook_url}" || true
+  )"
 
   http_code="$(printf '%s\n' "${response}" | tail -n1)"
   body="$(printf '%s\n' "${response}" | sed '$d')"
 
-  if [[ "${http_code}" -lt 200 || "${http_code}" -ge 300 ]]; then
+  if [[ ! "${http_code}" =~ ^[0-9]{3}$ ]]; then
+    echo "[WARN] Discord webhook request failed" >&2
+    return 1
+  fi
+
+  if (( http_code < 200 || http_code >= 300 )); then
     echo "[WARN] Discord webhook returned HTTP ${http_code}" >&2
-    [[ -n "${body}" ]] && echo "${body}" >&2
+
+    if [[ -n "${body}" ]]; then
+      echo "${body}" >&2
+    fi
+
     return 1
   fi
 }
@@ -119,27 +187,55 @@ send_discord_payload() {
 send_discord_info() {
   local title="${1}"
   local message="${2}"
-  local username="${3:-docker-services}"
-  send_discord_payload "$(build_discord_embed_payload "ℹ️ ${title}" "${message}" 3447003 "${username}")"
+  local username="${3:-${PROJECT_NAME}}"
+
+  send_discord_payload "$(
+    build_discord_embed_payload \
+      "ℹ️ ${title}" \
+      "${message}" \
+      3447003 \
+      "${username}"
+  )"
 }
 
 send_discord_success() {
   local title="${1}"
   local message="${2}"
-  local username="${3:-docker-services}"
-  send_discord_payload "$(build_discord_embed_payload "✅ ${title}" "${message}" 5763719 "${username}")"
+  local username="${3:-${PROJECT_NAME}}"
+
+  send_discord_payload "$(
+    build_discord_embed_payload \
+      "✅ ${title}" \
+      "${message}" \
+      5763719 \
+      "${username}"
+  )"
 }
 
 send_discord_warning() {
   local title="${1}"
   local message="${2}"
-  local username="${3:-docker-services}"
-  send_discord_payload "$(build_discord_embed_payload "⚠️ ${title}" "${message}" 16705372 "${username}")"
+  local username="${3:-${PROJECT_NAME}}"
+
+  send_discord_payload "$(
+    build_discord_embed_payload \
+      "⚠️ ${title}" \
+      "${message}" \
+      16705372 \
+      "${username}"
+  )"
 }
 
 send_discord_error() {
   local title="${1}"
   local message="${2}"
-  local username="${3:-docker-services}"
-  send_discord_payload "$(build_discord_embed_payload "❌ ${title}" "${message}" 15548997 "${username}")"
+  local username="${3:-${PROJECT_NAME}}"
+
+  send_discord_payload "$(
+    build_discord_embed_payload \
+      "❌ ${title}" \
+      "${message}" \
+      15548997 \
+      "${username}"
+  )"
 }

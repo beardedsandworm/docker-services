@@ -45,6 +45,11 @@ esphome.wormlogic.com {
 	reverse_proxy 10.42.20.4:6052
 }
 
+zigbee.wormlogic.com {
+    import dns_tls
+    reverse_proxy zigbee2mqtt:8080
+}
+
 ix.wormlogic.com {
     import dns_tls
     reverse_proxy 10.42.20.5:9119
@@ -126,4 +131,9 @@ qbittorrent.wormlogic.com {
 stash.wormlogic.com {
     import dns_tls
     reverse_proxy 10.42.42.3:9999
+}
+
+cloud.wormlogic.com {
+    import dns_tls
+    reverse_proxy nextcloud:80
 }

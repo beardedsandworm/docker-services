@@ -2,8 +2,9 @@
 Description=Run docker-services image update check daily
 
 [Timer]
-OnBootSec=15min
-OnUnitActiveSec=24h
+OnCalendar=*-*-* 02:00:00
+RandomizedDelaySec=15min
+AccuracySec=1min
 Persistent=true
 Unit=docker-services-image-check.service
 

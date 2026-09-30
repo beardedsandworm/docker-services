@@ -33,6 +33,13 @@
         href: https://midway.wormlogic.com
         description: Router, firewall, and DHCP
 
+    - Omada Controller:
+        icon: omada.png
+        href: https://omada.wormlogic.com
+        description: Switches and port management
+        server: arrakis
+        container: omada
+
     - Pi-hole 1:
         icon: pi-hole.png
         href: https://pihole1.wormlogic.com/admin
@@ -45,12 +52,12 @@
         server: arrakis
         container: pihole
 
-    - Omada Controller:
-        icon: omada.png
-        href: https://omada.wormlogic.com
-        description: Switches and port management
-        server: arrakis
-        container: omada
+    - Pi-hole 3:
+        icon: pi-hole.svg
+        href: https://pihole3.wormlogic.com/admin/
+        description: PVP DNS
+        server: heighliner
+        container: pihole
 
 - Home Services:
     - Home Assistant:
@@ -73,6 +80,13 @@
         description: ESP device management
         server: arrakis
         container: esphome
+
+    - Zigbee:
+        icon: zigbee2mqtt.png
+        href: https://zigbee.wormlogic.com
+        description: Zigbee device management
+        server: arrakis
+        container: zigbee2mqtt
 
 - Media:
     - Plex:

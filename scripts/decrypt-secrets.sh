@@ -14,6 +14,7 @@ SECRETS=(
   "esphome-secrets.yaml"
   "mqtt.env"
   "homepage-fastmail-ical.txt"
+  "nextcloud_db_password.txt"
 )
 
 mkdir -p "${RUNTIME_DIR}"
