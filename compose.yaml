@@ -338,11 +338,11 @@ services:
     environment:
       HOMEPAGE_ALLOWED_HOSTS: dashboard.wormlogic.com
       LOG_TARGETS: stdout
-      HOMEPAGE_FILE_FASTMAIL_ICAL: /run/secrets/homepage-fastmail-ical.txt
+      HOMEPAGE_FILE_PERSONAL_ICAL: /run/secrets/homepage-personal-ical.txt
     volumes:
       - ./config/homepage:/app/config
       - ./config/homepage/icons:/app/public/icons:ro
-      - ./runtime/server01/secrets/homepage-fastmail-ical.txt:/run/secrets/homepage-fastmail-ical.txt:ro
+      - ./runtime/server01/secrets/homepage-personal-ical.txt:/run/secrets/homepage-personal-ical.txt:ro
     networks:
       - proxy_network
       - homepage_docker

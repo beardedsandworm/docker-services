@@ -13,7 +13,7 @@ SECRETS=(
   "n8n.env"
   "esphome-secrets.yaml"
   "mqtt.env"
-  "homepage-fastmail-ical.txt"
+  "homepage-personal-ical.txt"
   "nextcloud_db_password.txt"
 )
 

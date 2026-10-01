@@ -9,7 +9,7 @@
           maxEvents: 10
           integrations:
             - type: ical
-              url: "{{HOMEPAGE_FILE_FASTMAIL_ICAL}}"
+              url: "{{HOMEPAGE_FILE_PERSONAL_ICAL}}"
               name: Personal
               color: purple
 
