@@ -67,6 +67,13 @@
         server: arrakis
         container: homeassistant
 
+    - NextCloud:
+        icon: nextcloud.png
+        href: https://cloud.wormlogic.com
+        description: Home cloud solutions
+        server: arrakis
+        container: nextcloud
+
     - Grocy:
         icon: grocy.png
         href: https://pantry.wormlogic.com
