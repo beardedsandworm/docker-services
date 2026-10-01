@@ -1,181 +1,771 @@
-# docker-services
+# 🐳 docker-services
 
-Declarative Docker Compose deployment for the services currently hosted on **Arrakis** (`server01`). The repository owns Compose definitions, proxy and application configuration intended for version control, encrypted secret sources, and host-side monitoring units. It does **not** make mutable application data recoverable by itself.
+> Declarative, recoverable, and observable Docker services for **Arrakis**.
 
-## Current deployment
+---
 
-Live state verified on Arrakis on 2026-08-22:
+## 💡 Philosophy
 
-- host: `arrakis`, Ubuntu 24.04 LTS;
-- repository: `/home/lightweight/docker-services`, branch `master`;
-- Compose configuration validates with the live `env/server01.env`;
-- the four Docker monitoring timers and the Pi-hole host shim are enabled and active;
-- 14 declared services are running;
-- `esphome` is stopped because the configured `/dev/ttyACM0` device is absent;
-- an old, stopped `beszel` container remains as a Compose orphan. Beszel Agent runs separately under `/opt/beszel-agent`.
+> **A service stack should be reproducible from Git, recoverable from encrypted state, observable while running, and explicit about what still requires backup.**
 
-The snapshot above describes observed state, not a promise that every service is healthy forever. Use the verification commands below for current state.
+`docker-services` is the application deployment layer for **Arrakis** (`server01`).
 
-## Services
+It owns:
 
-| Service | Purpose | Network / exposure | Persistent state |
-|---|---|---|---|
-| `pihole` | Primary containerized DNS filter | macvlan address on the home network | `config/pihole/etc-pihole` |
-| `caddy` | Internal reverse proxy and TLS | host ports 80/443; `proxy_network` | `config/caddy/{data,config}` |
-| `searxng` | Private metasearch | Caddy / `proxy_network` | `config/searxng` |
-| `postgres` | Database for n8n and related workflows | internal only | `config/postgres/data` |
-| `n8n` | Automation, event normalization, incident routing | Caddy / `proxy_network` | `config/n8n/data` |
-| `mosquitto` | MQTT broker | host port 1883 | `config/mosquitto` |
-| `zigbee2mqtt` | Zigbee coordinator and bridge | host port 8080; USB serial device | `config/zigbee2mqtt/data` |
-| `esphome` | ESPHome Device Builder | Caddy / `proxy_network`; optional local USB | `config/esphome` |
-| `homeassistant` | Home orchestration | host networking and DBus | `config/homeassistant` |
-| `matter-server` | Matter controller backend | host networking | `config/matter-server/data` |
-| `grocy` | Pantry and household inventory | `apps` profile; Caddy | `config/grocy` |
-| `monkeytype-*` | Self-hosted Monkeytype frontend, backend, MongoDB, and Redis | `apps` profile; Caddy | `config/monkeytype` |
+* 🐳 **Docker Compose service definitions**
+* 🌐 **Caddy routing and TLS configuration**
+* 🔐 **SOPS-encrypted service secrets**
+* 🧩 **Versioned application configuration**
+* ⚙️ **Repo-owned deployment automation**
+* 📊 **Service monitoring and health checks**
+* 🔔 **Incident/event reporting**
+* 🛠️ **Host integration required by the containers**
 
-Home Assistant remains on Arrakis deliberately. IX owns the LLM/agent runtime through the separate `llm-services` repository; VPS services are defined in `vps-services`.
+It does **not** pretend that Git alone makes mutable application data recoverable.
 
-## Repository boundary
+Databases, certificates, application databases, generated state, Home Assistant configuration, and other mutable runtime data require separate backup coverage.
 
-### Versioned here
+---
 
-- `compose.yaml` and the custom Caddy image;
-- Caddy routes and authored application configuration;
-- ESPHome device YAML and shared packages;
-- monitoring scripts and systemd units;
-- SOPS-encrypted secret sources under `secrets/server01/`;
-- secret templates and the non-secret environment example.
-
-### Local runtime state
-
-The following are intentionally not Git authority:
-
-- decrypted secrets under `runtime/server01/secrets/`;
-- the live environment file `env/server01.env`;
-- databases, logs, certificates, caches, generated ESPHome builds, and application-owned configuration under `config/`;
-- monitor state under `runtime/server01/monitor/`.
-
-A clean Git tree only proves that tracked deployment files match Git. It does not prove that ignored databases and application configuration are backed up. Recovery still requires approved backups of mutable state and the SOPS/age key needed to decrypt secret sources.
-
-## Networks
-
-- `home_network` is a macvlan used by Pi-hole. The host-side shim is installed as `pihole-host-shim.service` so Arrakis can reach the macvlan service.
-- `proxy_network` is the internal bridge shared by Caddy and proxied services.
-- Home Assistant and Matter Server use host networking for discovery and local integrations.
-- Postgres is intentionally not published to the host network.
-
-Internal DNS must point service hostnames at Arrakis, and Caddy must have a valid Cloudflare API token for DNS-based certificate work.
-
-## Secrets
-
-Encrypted sources are committed with SOPS:
+## ⚡ Mental Model
 
 ```text
-secrets/server01/*.enc
+Host ready
+    ↓
+Recover secrets
+    ↓
+Build required images
+    ↓
+Reconcile containers
+    ↓
+Install monitoring
+    ↓
+Install host integration
+    ↓
+Observe continuously
 ```
 
-Decryption writes runtime material to:
+Or operationally:
+
+```text
+Define → Decrypt → Deploy → Observe → Correct → Recover
+```
+
+* **Define** → Compose, Caddy, application configuration
+* **Decrypt** → SOPS-encrypted service secrets
+* **Deploy** → `deploy.sh` + Docker Compose
+* **Observe** → monitoring services and timers
+* **Correct** → update Git when desired state changes
+* **Recover** → rebuild the stack from repo + encrypted state + backups
+
+---
+
+# 🖥️ Host
+
+`docker-services` is currently owned by:
+
+| Host | ID | OS | Role |
+| --- | --- | --- | --- |
+| 🏜️ Arrakis | `server01` | Ubuntu | Primary Docker / home-services host |
+
+Host bootstrap, packages, SSH identity, age identity, WireGuard and system-level configuration are owned by:
+
+```text
+linux-environments
+```
+
+`docker-services` begins where the Arrakis host bootstrap ends.
+
+---
+
+# 🧩 Repository Structure
+
+```text
+docker-services/
+├── compose.yaml
+├── deploy.sh
+├── dc
+│
+├── config/
+│   ├── caddy/
+│   ├── esphome/
+│   ├── homepage/
+│   ├── homeassistant/
+│   ├── matter-server/
+│   ├── mosquitto/
+│   ├── n8n/
+│   ├── pihole/
+│   ├── postgres/
+│   ├── searxng/
+│   ├── zigbee2mqtt/
+│   └── ...
+│
+├── env/
+│   └── server01.env
+│
+├── scripts/
+│   ├── decrypt-secrets.sh
+│   ├── install-monitoring-units.sh
+│   ├── pihole-host-shim.sh
+│   ├── image-check.sh
+│   ├── emit-event.sh
+│   └── ...
+│
+├── secrets/
+│   └── server01/
+│       └── *.enc
+│
+├── runtime/
+│   └── server01/
+│       ├── secrets/
+│       └── monitor/
+│
+└── systemd/
+    ├── docker-services-monitor.*
+    ├── docker-services-startup-check.*
+    ├── docker-services-image-check.*
+    ├── pihole-host-shim.service
+    └── ...
+```
+
+Generated runtime state belongs under `runtime/` or the application's own data directory and is not Git authority.
+
+---
+
+# 🧱 Repository Boundary
+
+## ✅ Versioned Here
+
+The repository owns things that describe **desired service state**, including:
+
+* `compose.yaml`
+* custom Caddy build definition
+* Caddy routes
+* authored Homepage configuration
+* ESPHome device YAML and shared packages
+* service configuration intended for Git
+* monitoring scripts
+* systemd units
+* deployment scripts
+* encrypted SOPS secret sources
+* environment examples and other non-secret deployment metadata
+
+---
+
+## 🗄️ Mutable Runtime State
+
+Git is **not** the authority for application-owned mutable data.
+
+Examples include:
+
+* PostgreSQL databases
+* Home Assistant state/configuration
+* Nextcloud data and database state
+* MQTT runtime data
+* Zigbee2MQTT runtime state
+* Caddy certificates and caches
+* generated ESPHome build state
+* MongoDB / Redis runtime data
+* n8n execution/runtime state
+* application logs
+* downloaded/generated media metadata
+* other service-specific databases and caches
+
+A clean Git tree means:
+
+> **The declarative deployment matches Git.**
+
+It does **not** mean:
+
+> **Every byte required for disaster recovery is safely backed up.**
+
+Mutable state requires its own approved backup strategy.
+
+---
+
+# 🐳 Services
+
+Arrakis hosts the core home-services stack.
+
+Major service groups include:
+
+## 🌐 Infrastructure
+
+* **Pi-hole** — primary DNS filtering
+* **Caddy** — reverse proxy and TLS
+* **PostgreSQL** — shared application database backend
+* **Mosquitto** — MQTT broker
+* **Homepage** — unified Wormlogic dashboard
+* **Glance** — embedded/news dashboard content
+* **Beszel integration** — host/service monitoring
+
+---
+
+## 🏠 Home Automation
+
+* **Home Assistant**
+* **ESPHome**
+* **Zigbee2MQTT**
+* **Matter Server**
+* **Mosquitto**
+
+Home Assistant deliberately remains on Arrakis rather than moving into the Kubernetes cluster.
+
+---
+
+## 🧰 Applications
+
+Examples include:
+
+* **SearXNG**
+* **Grocy**
+* **n8n**
+* **Monkeytype**
+* **Nextcloud**
+* media-management applications declared by the current Compose stack
+
+The Compose file remains the authoritative inventory for what Arrakis currently deploys.
+
+To inspect that inventory:
+
+```bash
+./dc config --services
+```
+
+---
+
+# 🌐 Networking
+
+Several networking models coexist intentionally.
+
+## `proxy_network`
+
+Internal bridge shared by Caddy and reverse-proxied services.
+
+```text
+client
+  ↓
+Caddy
+  ↓
+proxy_network
+  ↓
+application
+```
+
+Services should generally talk to one another across the LAN or their Docker network rather than using WireGuard addresses when both hosts are on the same physical network.
+
+---
+
+## Pi-hole macvlan
+
+Pi-hole uses a macvlan attachment so it can exist directly on the network.
+
+Because a Linux host cannot normally communicate directly with its own macvlan child, Arrakis also requires the host-side shim:
+
+```text
+pihole-host-shim.service
+```
+
+The deployment workflow installs and enables this unit.
+
+---
+
+## Host Networking
+
+Services such as Home Assistant and Matter Server use host networking where local discovery and multicast behavior require it.
+
+---
+
+# 🔐 Secrets
+
+Encrypted secret authority lives under:
+
+```text
+secrets/server01/
+```
+
+Examples include:
+
+```text
+cloudflare_api_token.txt.enc
+pihole_web_password.txt.enc
+postgres.env.enc
+n8n.env.enc
+mqtt.env.enc
+monkeytype-db.env.enc
+homepage-personal-ical.txt.enc
+homepage-birthdays-ical.txt.enc
+...
+```
+
+The exact inventory may evolve with the stack.
+
+Secrets are encrypted with **SOPS + Arrakis's age identity**.
+
+The machine age identity itself is recovered by `linux-environments`.
+
+---
+
+## Runtime Secrets
+
+Encrypted sources are materialized into:
 
 ```text
 runtime/server01/secrets/
 ```
 
-Do not commit decrypted files. To create the live runtime material:
+using:
 
 ```bash
 ./scripts/decrypt-secrets.sh
 ```
 
-`N8N_ENCRYPTION_KEY` must be preserved across rebuilds or stored n8n credentials become unreadable.
+These decrypted files are runtime material only.
 
-## Deployment
+They must never be committed.
 
-Host bootstrap is owned by [`linux-environments`](https://github.com/beardedsandworm/linux-environments). On an already bootstrapped Arrakis:
+---
 
-```bash
-git clone git@github.com:beardedsandworm/docker-services.git ~/docker-services
-cd ~/docker-services
-cp env/server01.env.example env/server01.env
-# Fill non-secret host settings, provision the age key, then:
-./scripts/decrypt-secrets.sh
-./scripts/validate.sh
-./scripts/up-apps.sh
-sudo ./scripts/install-monitoring-units.sh
+## Important Persistent Secrets
+
+Some service secrets are identity-bearing rather than disposable.
+
+For example:
+
+```text
+N8N_ENCRYPTION_KEY
 ```
 
-Start the containers before installing the monitoring units: the installer immediately smoke-tests the startup checker and will fail when no Compose services exist. The current installer does not install the Pi-hole macvlan shim; recovery must separately install `scripts/pihole-host-shim.sh` as `/usr/local/sbin/pihole-host-shim`, install `systemd/pihole-host-shim.service`, then reload systemd and enable the unit.
+must survive rebuilds or previously stored n8n credentials become unreadable.
 
-Use `./scripts/up.sh` when the `apps` profile (`grocy` and Monkeytype) is intentionally excluded.
+The same principle applies to any service credential that encrypts or identifies persistent application state.
 
-Common lifecycle commands:
+---
+
+# 🔑 Repository Deploy Key
+
+Arrakis uses a repository-specific GitHub deploy key for `docker-services`:
+
+```text
+~/.ssh/id_ed25519_git_docker-services
+```
+
+Example comment:
+
+```text
+server01:github:docker-services
+```
+
+The repository is locally bound to this key through Git's `core.sshCommand`.
+
+This keeps Git access for `docker-services` independent from:
+
+* the host SSH identity
+* `linux-environments`
+* other service repositories
+
+The normal `linux-environments` scheduled credential capture will discover and preserve the deploy key after it is created.
+
+---
+
+# 🚀 Deployment
+
+The primary deployment entry point is:
 
 ```bash
-./scripts/validate.sh       # render and validate Compose configuration
-./scripts/up.sh             # start core services
-./scripts/up-apps.sh        # start core plus apps-profile services
-./scripts/down.sh           # stop the project
+./deploy.sh
 ```
+
+The deploy script owns the complete application reconciliation path for Arrakis.
+
+Current flow:
+
+```text
+validate repository
+        ↓
+decrypt service secrets
+        ↓
+build Caddy
+        ↓
+./dc up -d
+        ↓
+install monitoring units
+        ↓
+install Pi-hole host shim
+        ↓
+create / verify docker-services deploy key
+        ↓
+bind Git repository to deploy key
+        ↓
+display public deploy key
+        ↓
+Press Enter to continue
+```
+
+---
+
+## Monitoring Webhook Setup
+
+The monitoring installer manages its dedicated Discord webhook.
+
+If:
+
+```text
+~/.config/docker-services/discord-webhook
+```
+
+already exists, it is preserved.
+
+If it does not exist, the installer interactively asks for a webhook.
+
+This lets a new recovery remain simple without requiring the webhook to be embedded in `deploy.sh`.
+
+---
+
+# 🔄 Recovery Flow
+
+The intended Arrakis recovery path is:
+
+```text
+clone linux-environments
+        ↓
+bootstrap Arrakis host
+        ↓
+recover age / SSH / WireGuard
+        ↓
+reboot
+        ↓
+clone docker-services
+        ↓
+./deploy.sh
+        ↓
+register deploy key if new
+        ↓
+Press Enter
+        ↓
+capture credentials
+```
+
+The long-term goal is for `linux-environments` to orchestrate that handoff automatically while leaving application deployment logic here.
+
+---
+
+# 🛠️ `dc` Wrapper
+
+Use the repo wrapper rather than repeatedly spelling out the machine-specific Compose invocation.
+
+Examples:
+
+```bash
+./dc ps
+./dc logs
+./dc pull
+./dc build
+./dc up -d
+./dc down
+```
+
+Service-specific operations work normally:
+
+```bash
+./dc logs homepage
+./dc restart homeassistant
+./dc up -d --force-recreate homepage
+```
+
+Remember:
+
+```text
+restart ≠ recreate
+```
+
+A container **restart** does not apply changed:
+
+* environment variables
+* bind mounts
+* Compose configuration
+* image definitions
+
+When Compose configuration changes, reconcile with:
+
+```bash
+./dc up -d
+```
+
+or explicitly:
+
+```bash
+./dc up -d --force-recreate <service>
+```
+
+---
+
+# 🔨 Caddy
+
+Caddy is built locally because the Wormlogic deployment requires its DNS provider integration.
+
+The deployment script performs:
+
+```bash
+./dc build caddy
+```
+
+before reconciling the stack.
+
+Caddy uses the encrypted Cloudflare token materialized from the server01 secret store.
+
+Routing configuration belongs in Git.
+
+Caddy's generated certificates and runtime data do not.
+
+---
+
+# 📊 Monitoring
+
+`docker-services` owns monitoring for the application stack running on Arrakis.
+
+Current monitoring includes:
+
+| Unit | Purpose |
+| --- | --- |
+| `docker-services-monitor.timer` | Detect service state / health changes |
+| `docker-services-startup-check.timer` | Validate the stack after startup |
+| `docker-services-image-check.timer` | Check container image update state |
+| `pihole-host-shim.service` | Maintain Arrakis ↔ Pi-hole macvlan reachability |
+
+The monitoring installer:
+
+```bash
+scripts/install-monitoring-units.sh
+```
+
+copies the units into systemd, enables their timers and immediately smoke-tests the corresponding services.
+
+That makes installation itself part of verification.
+
+---
+
+# 🔔 Event Reporting
+
+Monitoring can emit structured events into the Wormlogic automation pipeline.
+
+```text
+docker-services
+      ↓
+emit-event.sh
+      ↓
+n8n
+      ↓
+normalization / persistence / routing
+      ↓
+Discord
+```
+
+The intended monitoring policy is:
+
+> **Silence is success.**
+
+Healthy steady state should not constantly demand attention.
+
+Notifications should primarily represent:
+
+* failures
+* state changes
+* degraded health
+* disk pressure
+* image availability
+* recovery/install failures
+* other actionable conditions
+
+n8n owns higher-level concerns such as:
+
+* deduplication
+* suppression
+* incident persistence
+* escalation
+* routing
+
+---
+
+# 🧪 Verification
+
+## Repository
+
+```bash
+git status --short --branch
+```
+
+---
+
+## Compose
+
+```bash
+./dc config
+./dc config --services
+./dc ps
+```
+
+Include stopped services when needed:
+
+```bash
+./dc ps --all
+```
+
+---
 
 ## Monitoring
 
-System-level timers run:
-
-| Unit | Purpose |
-|---|---|
-| `docker-services-startup-check.timer` | Validate Compose and inspect all declared services after boot |
-| `docker-services-monitor.timer` | Detect declared container state/health changes every minute |
-| `docker-services-disk-check.timer` | Report disk pressure |
-| `docker-services-image-check.timer` | Report image update state |
-
-Monitoring emits structured events through `scripts/emit-event.sh` when an n8n event webhook is configured. n8n owns deduplication, suppression, incident persistence, escalation, and alert routing. The intended policy is **silence is success**: routine state should not generate attention unless something changed or failed.
-
-The container checks deliberately include stopped declared services and exclude old Compose orphans. Inspect orphans separately during maintenance.
-
-## Verification
-
 ```bash
-cd ~/docker-services
-
-# Repository and deployment intent
-git status --short --branch
-./scripts/validate.sh
-
-# Declared services, including stopped containers but excluding orphans
-docker compose --env-file env/server01.env --profile apps \
-  ps --all --orphans=false
-
-# Orphans and other historical containers
-docker compose --env-file env/server01.env --profile apps ps --all
-
-# Monitoring units
 systemctl status \
-  docker-services-startup-check.timer \
   docker-services-monitor.timer \
-  docker-services-disk-check.timer \
+  docker-services-startup-check.timer \
   docker-services-image-check.timer \
   pihole-host-shim.service
-
-journalctl -u docker-services-monitor.service -n 50 --no-pager
 ```
 
-## Known operational gaps
+Recent monitor activity:
 
-- `esphome` currently cannot start while `/dev/ttyACM0` is absent. Either restore the expected USB device/path or make local USB passthrough optional before restarting it.
-- A clean clone cannot recreate the full MQTT/Zigbee/Monkeytype stack: the Mosquitto password file, Zigbee2MQTT data/config, and Monkeytype Firebase service-account JSON have no complete encrypted-source/provisioning path.
-- `env/server01.env.example` does not currently define every variable required by Compose, including ESPHome and n8n settings, and its SearXNG hostname differs from the live Caddy route. Treat it as a starting point, not a sufficient deployment manifest.
-- The monitoring systemd units hard-code the `lightweight` account and `/home/lightweight/docker-services`; the installer is not portable to another checkout owner/path.
-- `image-check.sh` suppresses `docker compose pull --dry-run` errors and can therefore report “up to date” after a pull/auth/network failure.
-- The stopped orphaned `beszel` container should be removed after confirming no migration rollback depends on it.
-- Mutable data and live Home Assistant configuration remain ignored local state; off-host backup coverage must be verified independently.
-- Several images use floating tags such as `latest`, `stable`, or a broad version variable. This eases updates but weakens deterministic rebuilds; pin digests or tested versions where rollback certainty matters.
+```bash
+journalctl \
+  -u docker-services-monitor.service \
+  -n 50 \
+  --no-pager
+```
 
-## Related repositories
+---
 
-- [`linux-environments`](https://github.com/beardedsandworm/linux-environments) — host bootstrap, package snapshots, dotfiles, and host maintenance timers.
-- [`llm-services`](https://github.com/beardedsandworm/llm-services) — Hermes/LLM deployment on IX.
-- [`vps-services`](https://github.com/beardedsandworm/vps-services) — public VPS services on Heighliner.
-- [`wormlogic-gitops`](https://github.com/beardedsandworm/wormlogic-gitops) — Kubernetes/Talos/Flux work.
+## Runtime Secrets
 
-## Author
+List materialized secret filenames without exposing their contents:
 
-Matthew Garry
+```bash
+find runtime/server01/secrets \
+  -maxdepth 1 \
+  -type f \
+  -printf '%f\n' \
+  | sort
+```
+
+---
+
+# 🧱 Backup Boundary
+
+A complete Arrakis recovery depends on three layers:
+
+```text
+1. linux-environments
+   ↓
+host + machine credentials
+
+2. docker-services
+   ↓
+declarative application deployment + encrypted secrets
+
+3. mutable-state backups
+   ↓
+databases + application-owned data
+```
+
+None of the three replaces the others.
+
+The repository should make it obvious which category any important state belongs to.
+
+---
+
+# 🧠 Design Rules
+
+A few rules keep Arrakis manageable:
+
+* **Host configuration belongs in `linux-environments`.**
+* **Docker/application deployment belongs here.**
+* **Secrets are encrypted with SOPS at rest.**
+* **Decrypted secrets live only under runtime state.**
+* **Each repository gets its own GitHub deploy key.**
+* **Mutable application state is not disguised as Git-managed configuration.**
+* **Deployment scripts should be safe to rerun.**
+* **Monitoring installation should verify itself.**
+* **Container state should reconcile from Compose rather than manual Docker commands.**
+* **Internal Docker/LAN traffic should use the appropriate local network, not WireGuard unnecessarily.**
+* **Generated runtime directories do not become accidental repository structure.**
+* **Recovery paths are infrastructure and should be tested like infrastructure.**
+
+---
+
+# 🗺️ Repository Ownership
+
+The main Wormlogic infrastructure repositories have distinct responsibilities:
+
+| Repository | Responsibility |
+| --- | --- |
+| 🧠 `linux-environments` | Host bootstrap, packages, credentials, networking and host automation |
+| 🐳 `docker-services` | Arrakis application stack |
+| 🤖 `llm-services` | IX / Hermes / agent stack |
+| 🚀 `vps-services` | Heighliner VPS application stack |
+| 🪱 `wormlogic-gitops` | Shai-Hulud Talos / Flux / Kubernetes state |
+
+The boundary is intentional:
+
+```text
+linux-environments
+        ↓
+prepare host
+
+service repository
+        ↓
+deploy workload
+```
+
+A service repository should not duplicate host bootstrap logic, and the host bootstrap should not duplicate application deployment logic.
+
+---
+
+# 🔭 Future Direction
+
+The remaining recovery work is largely about closing the gap around **mutable state**.
+
+The desired end state is:
+
+```text
+host dies
+   ↓
+rebuild host
+   ↓
+recover identities
+   ↓
+deploy docker-services
+   ↓
+restore mutable application state
+   ↓
+services return
+```
+
+At that point, losing Arrakis should be inconvenient rather than catastrophic.
+
+---
+
+# 📌 Summary
+
+`docker-services` is the declarative deployment and operational layer for the services hosted on Arrakis.
+
+It provides:
+
+* 🐳 Compose-managed application deployment
+* 🌐 Caddy proxy and TLS configuration
+* 🔐 SOPS-encrypted service secrets
+* 🔑 repository-specific GitHub authentication
+* 🏠 home-automation infrastructure
+* 📊 service monitoring and startup validation
+* 🔔 structured incident reporting
+* 🛠️ required host/container integration
+* 🔄 a repeatable recovery path
+* 🧱 an explicit boundary between Git state and mutable backups
+
+The goal is simple:
+
+> **Arrakis should be rebuildable from known state, not reconstructed from memory.**
+
+---
+
+## 🧑‍💻 Author
+
+Matthew J Garry
