@@ -23,7 +23,7 @@ It owns:
 
 It does **not** pretend that Git alone makes mutable application data recoverable.
 
-Databases, certificates, application databases, generated state, Home Assistant configuration, and other mutable runtime data require separate backup coverage.
+Databases, certificates, generated state, Home Assistant configuration, and other mutable runtime data require separate backup coverage.
 
 ---
 
@@ -82,6 +82,7 @@ linux-environments
 
 ```text
 docker-services/
+├── .sops.yaml
 ├── compose.yaml
 ├── deploy.sh
 ├── dc
@@ -101,7 +102,8 @@ docker-services/
 │   └── ...
 │
 ├── env/
-│   └── server01.env
+│   ├── server01.env.example       # tracked schema / safe defaults
+│   └── server01.env               # ignored, decrypted deployment environment
 │
 ├── scripts/
 │   ├── decrypt-secrets.sh
@@ -113,7 +115,9 @@ docker-services/
 │
 ├── secrets/
 │   └── server01/
-│       └── *.enc
+│       ├── *.enc                  # top-level runtime-secret sources
+│       └── env/
+│           └── server01.env.enc  # encrypted recovery copy of env/server01.env
 │
 ├── runtime/
 │   └── server01/
@@ -128,7 +132,7 @@ docker-services/
     └── ...
 ```
 
-Generated runtime state belongs under `runtime/` or the application's own data directory and is not Git authority.
+Generated runtime state belongs under `runtime/`, an application's own data directory, or an explicitly ignored local path such as `env/server01.env`. Plaintext runtime state is not Git authority.
 
 ---
 
@@ -222,9 +226,9 @@ Examples include:
 * **n8n**
 * **Monkeytype**
 * **Nextcloud**
-* media-management applications declared by the current Compose stack
+* remote media-service links/integrations exposed through Homepage or reverse-proxy configuration
 
-The Compose file remains the authoritative inventory for what Arrakis currently deploys.
+The Compose file remains the authoritative inventory for what Arrakis actually deploys. Remote media-management services linked from Arrakis are integrations, not Arrakis-owned Compose workloads unless they explicitly appear in `compose.yaml`.
 
 To inspect that inventory:
 
@@ -266,7 +270,19 @@ Because a Linux host cannot normally communicate directly with its own macvlan c
 pihole-host-shim.service
 ```
 
-The deployment workflow installs and enables this unit.
+The deployment workflow installs:
+
+```text
+scripts/pihole-host-shim.sh
+        ↓
+/usr/local/sbin/pihole-host-shim
+
+systemd/pihole-host-shim.service
+        ↓
+/etc/systemd/system/pihole-host-shim.service
+```
+
+It then reloads systemd, enables the unit, starts it, and fails deployment if the service is not active.
 
 ---
 
@@ -288,13 +304,14 @@ Examples include:
 
 ```text
 cloudflare_api_token.txt.enc
+esphome-secrets.yaml.enc
 pihole_web_password.txt.enc
 postgres.env.enc
 n8n.env.enc
 mqtt.env.enc
 monkeytype-db.env.enc
 homepage-personal-ical.txt.enc
-homepage-birthdays-ical.txt.enc
+env/server01.env.enc
 ...
 ```
 
@@ -306,9 +323,9 @@ The machine age identity itself is recovered by `linux-environments`.
 
 ---
 
-## Runtime Secrets
+## Runtime Secrets and Compose Environment
 
-Encrypted sources are materialized into:
+Top-level encrypted service-secret sources are materialized into:
 
 ```text
 runtime/server01/secrets/
@@ -320,9 +337,23 @@ using:
 ./scripts/decrypt-secrets.sh
 ```
 
-These decrypted files are runtime material only.
+That script intentionally handles the top-level `secrets/server01/*.enc` runtime-secret inventory.
 
-They must never be committed.
+The Compose environment follows a separate recovery path so it is not swept into `runtime/server01/secrets/`:
+
+```text
+secrets/server01/env/server01.env.enc
+        ↓
+SOPS binary decrypt in deploy.sh
+        ↓
+env/server01.env
+```
+
+`env/server01.env.example` is the tracked schema and safe example. `env/server01.env` is the real ignored deployment environment and may contain credentials.
+
+`deploy.sh` requires the encrypted env recovery artifact, restores `env/server01.env` with mode `0600`, validates the required runtime-secret files, and renders `./dc config` before building or starting services.
+
+All decrypted credential material is local runtime/deployment state and must never be committed.
 
 ---
 
@@ -376,14 +407,20 @@ The primary deployment entry point is:
 ./deploy.sh
 ```
 
-The deploy script owns the complete application reconciliation path for Arrakis.
+The deploy script owns the reproducible configuration/secrets reconciliation path for the Arrakis application stack. It does not yet restore mutable application data.
 
 Current flow:
 
 ```text
-validate repository
+validate repository + required encrypted sources
         ↓
-decrypt service secrets
+decrypt top-level runtime secrets
+        ↓
+restore env/server01.env from secrets/server01/env/server01.env.enc
+        ↓
+validate required decrypted files
+        ↓
+render ./dc config
         ↓
 build Caddy
         ↓
@@ -391,7 +428,9 @@ build Caddy
         ↓
 install monitoring units
         ↓
-install Pi-hole host shim
+install Pi-hole shim script + systemd unit
+        ↓
+verify Pi-hole shim is active
         ↓
 create / verify docker-services deploy key
         ↓
@@ -399,7 +438,7 @@ bind Git repository to deploy key
         ↓
 display public deploy key
         ↓
-Press Enter to continue
+prompt only when running interactively
 ```
 
 ---
@@ -424,7 +463,7 @@ This lets a new recovery remain simple without requiring the webhook to be embed
 
 # 🔄 Recovery Flow
 
-The intended Arrakis recovery path is:
+The current Arrakis configuration/secrets recovery path is:
 
 ```text
 clone linux-environments
@@ -439,14 +478,22 @@ clone docker-services
         ↓
 ./deploy.sh
         ↓
-register deploy key if new
+decrypt runtime secrets + restore server01.env
         ↓
-Press Enter
+validate recovered configuration
         ↓
-capture credentials
+reconcile containers + host integration
+        ↓
+register deploy key if newly generated
+        ↓
+scheduled host credential capture preserves the deploy key
 ```
 
-The long-term goal is for `linux-environments` to orchestrate that handoff automatically while leaving application deployment logic here.
+The deploy-key pause occurs only when `deploy.sh` has an interactive stdin.
+
+This is not yet a complete Arrakis disaster-recovery workflow. Configuration and encrypted credentials are recoverable, but mutable application state still requires backup and restore coverage.
+
+The long-term goal is for `linux-environments` to orchestrate the host → service-repository handoff automatically while leaving application deployment logic here.
 
 ---
 
@@ -543,6 +590,12 @@ copies the units into systemd, enables their timers and immediately smoke-tests 
 
 That makes installation itself part of verification.
 
+`image-check.sh` follows the **silence is success** policy:
+
+* image updates available → notify;
+* check/registry failure → notify;
+* no updates → write the clean result locally/journal only, with no Discord success message.
+
 ---
 
 # 🔔 Event Reporting
@@ -634,9 +687,23 @@ journalctl \
 
 ---
 
-## Runtime Secrets
+## Recovered Environment and Runtime Secrets
 
-List materialized secret filenames without exposing their contents:
+Verify that the Compose environment exists without printing its contents:
+
+```bash
+test -s env/server01.env &&
+  echo "server01.env present"
+```
+
+Verify Compose can consume the recovered environment:
+
+```bash
+./dc config >/dev/null &&
+  echo "Compose configuration valid"
+```
+
+List materialized runtime-secret filenames without exposing their contents:
 
 ```bash
 find runtime/server01/secrets \
@@ -659,7 +726,7 @@ host + machine credentials
 
 2. docker-services
    ↓
-declarative application deployment + encrypted secrets
+declarative application deployment + encrypted secrets/configuration
 
 3. mutable-state backups
    ↓
@@ -679,7 +746,7 @@ A few rules keep Arrakis manageable:
 * **Host configuration belongs in `linux-environments`.**
 * **Docker/application deployment belongs here.**
 * **Secrets are encrypted with SOPS at rest.**
-* **Decrypted secrets live only under runtime state.**
+* **Decrypted mounted secrets live under `runtime/`; the recovered Compose environment lives at ignored `env/server01.env`.**
 * **Each repository gets its own GitHub deploy key.**
 * **Mutable application state is not disguised as Git-managed configuration.**
 * **Deployment scripts should be safe to rerun.**
@@ -757,7 +824,7 @@ It provides:
 * 📊 service monitoring and startup validation
 * 🔔 structured incident reporting
 * 🛠️ required host/container integration
-* 🔄 a repeatable recovery path
+* 🔄 a repeatable configuration/credential recovery path
 * 🧱 an explicit boundary between Git state and mutable backups
 
 The goal is simple:
