@@ -11,9 +11,31 @@ DEPLOY_KEY_PUB="${DEPLOY_KEY}.pub"
 DOCKER_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/docker-services"
 DOCKER_WEBHOOK_FILE="${DOCKER_CONFIG_DIR}/discord-webhook"
 
+PIHOLE_SHIM_SCRIPT="$REPO_ROOT/scripts/pihole-host-shim.sh"
+PIHOLE_SHIM_TARGET="/usr/local/sbin/pihole-host-shim"
 PIHOLE_SHIM_SERVICE="pihole-host-shim.service"
 
+ENV_RECOVERY_FILE="$REPO_ROOT/secrets/$MACHINE_ID/env/server01.env.enc"
+ENV_FILE="$REPO_ROOT/env/server01.env"
+
+RUNTIME_SECRETS_DIR="$REPO_ROOT/runtime/$MACHINE_ID/secrets"
+
+REQUIRED_RUNTIME_SECRETS=(
+    "cloudflare_api_token.txt"
+    "esphome-secrets.yaml"
+    "monkeytype-db.env"
+    "mqtt.env"
+    "n8n.env"
+    "pihole_web_password.txt"
+    "postgres.env"
+)
+
 cd "$REPO_ROOT"
+
+
+# --------------------------------------------------
+# Helpers
+# --------------------------------------------------
 
 die() {
     printf '✗ %s\n' "$*" >&2
@@ -30,6 +52,15 @@ require_file() {
     [[ -f "$1" ]] || die "Required file not found: $1"
 }
 
+require_nonempty_file() {
+    [[ -s "$1" ]] || die "Required file is missing or empty: $1"
+}
+
+require_command() {
+    command -v "$1" >/dev/null 2>&1 \
+        || die "Required command not found: $1"
+}
+
 
 # --------------------------------------------------
 # Validate repository
@@ -39,9 +70,20 @@ step "Validating docker-services repository"
 
 require_file "$REPO_ROOT/scripts/decrypt-secrets.sh"
 require_file "$REPO_ROOT/scripts/install-monitoring-units.sh"
+require_file "$PIHOLE_SHIM_SCRIPT"
 require_file "$REPO_ROOT/systemd/$PIHOLE_SHIM_SERVICE"
 require_file "$REPO_ROOT/dc"
 require_file "$REPO_ROOT/compose.yaml"
+require_file "$ENV_RECOVERY_FILE"
+
+require_command git
+require_command sops
+require_command ssh-keygen
+require_command install
+require_command systemctl
+
+[[ -x "$REPO_ROOT/dc" ]] \
+    || die "Compose wrapper is not executable: $REPO_ROOT/dc"
 
 git -C "$REPO_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
     || die "$REPO_ROOT is not a Git repository"
@@ -50,14 +92,72 @@ printf '✓ Repository: %s\n' "$REPO_ROOT"
 
 
 # --------------------------------------------------
-# Secrets
+# Decrypt runtime secrets
 # --------------------------------------------------
 
 step "Decrypting service secrets"
 
 bash "$REPO_ROOT/scripts/decrypt-secrets.sh"
 
-printf '✓ Secrets materialized\n'
+printf '✓ Runtime secrets materialized\n'
+
+
+# --------------------------------------------------
+# Restore Compose environment
+# --------------------------------------------------
+
+step "Restoring Arrakis Compose environment"
+
+mkdir -p "$(dirname "$ENV_FILE")"
+
+ENV_TMP="$(mktemp)"
+
+cleanup_env_tmp() {
+    rm -f "$ENV_TMP"
+}
+
+trap cleanup_env_tmp EXIT
+
+if ! sops --decrypt \
+    --input-type json \
+    --output-type binary \
+    "$ENV_RECOVERY_FILE" \
+    > "$ENV_TMP"; then
+
+    die "Failed to decrypt $ENV_RECOVERY_FILE"
+fi
+
+require_nonempty_file "$ENV_TMP"
+
+install -m 0600 \
+    "$ENV_TMP" \
+    "$ENV_FILE"
+
+rm -f "$ENV_TMP"
+trap - EXIT
+
+printf '✓ Compose environment restored: %s\n' "$ENV_FILE"
+
+
+# --------------------------------------------------
+# Validate recovered state
+# --------------------------------------------------
+
+step "Validating recovered configuration"
+
+require_nonempty_file "$ENV_FILE"
+
+for secret in "${REQUIRED_RUNTIME_SECRETS[@]}"; do
+    require_nonempty_file "$RUNTIME_SECRETS_DIR/$secret"
+done
+
+printf '✓ All required decrypted files are present\n'
+
+if ! "$REPO_ROOT/dc" config >/dev/null; then
+    die "Docker Compose configuration could not be rendered"
+fi
+
+printf '✓ Docker Compose configuration renders successfully\n'
 
 
 # --------------------------------------------------
@@ -112,6 +212,10 @@ printf '✓ Monitoring services and timers installed\n'
 
 step "Installing Pi-hole host shim"
 
+sudo install -m 0755 \
+    "$PIHOLE_SHIM_SCRIPT" \
+    "$PIHOLE_SHIM_TARGET"
+
 sudo install -m 0644 \
     "$REPO_ROOT/systemd/$PIHOLE_SHIM_SERVICE" \
     "/etc/systemd/system/$PIHOLE_SHIM_SERVICE"
@@ -124,6 +228,7 @@ if ! sudo systemctl is-active --quiet "$PIHOLE_SHIM_SERVICE"; then
     die "$PIHOLE_SHIM_SERVICE failed to start"
 fi
 
+printf '✓ Pi-hole host shim installed: %s\n' "$PIHOLE_SHIM_TARGET"
 printf '✓ %s installed and active\n' "$PIHOLE_SHIM_SERVICE"
 
 
@@ -165,9 +270,12 @@ chmod 644 "$DEPLOY_KEY_PUB"
 # Ensure GitHub origin uses SSH
 # --------------------------------------------------
 
-ORIGIN_URL="$(git -C "$REPO_ROOT" remote get-url origin 2>/dev/null || true)"
+ORIGIN_URL="$(
+    git -C "$REPO_ROOT" remote get-url origin 2>/dev/null || true
+)"
 
-[[ -n "$ORIGIN_URL" ]] || die "Git remote 'origin' is not configured"
+[[ -n "$ORIGIN_URL" ]] \
+    || die "Git remote 'origin' is not configured"
 
 case "$ORIGIN_URL" in
     git@github.com:*)
@@ -202,7 +310,9 @@ git -C "$REPO_ROOT" config --local \
 
 printf '✓ %s is bound to its repo-specific deploy key\n' "$REPO_NAME"
 
-FINAL_ORIGIN="$(git -C "$REPO_ROOT" remote get-url origin)"
+FINAL_ORIGIN="$(
+    git -C "$REPO_ROOT" remote get-url origin
+)"
 
 case "$FINAL_ORIGIN" in
     git@github.com:*)
@@ -222,6 +332,9 @@ step "Arrakis deployment complete"
 
 printf 'Repository:          %s\n' "$REPO_ROOT"
 printf 'Machine:             %s\n' "$MACHINE_ID"
+printf 'Compose environment: %s\n' "$ENV_FILE"
+printf 'Runtime secrets:     %s\n' "$RUNTIME_SECRETS_DIR"
+printf 'Pi-hole shim:        %s\n' "$PIHOLE_SHIM_TARGET"
 printf 'Git origin:          %s\n' "$FINAL_ORIGIN"
 printf 'Deploy private key:  %s\n' "$DEPLOY_KEY"
 printf 'Deploy public key:   %s\n' "$DEPLOY_KEY_PUB"
