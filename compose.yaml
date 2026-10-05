@@ -205,7 +205,7 @@ services:
 
   monkeytype-mongodb:
     container_name: monkeytype-mongodb
-    image: mongo:latest
+    image: mongo:8.2
     restart: unless-stopped
 #    profiles: ["apps"]
 
@@ -229,7 +229,7 @@ services:
 
   monkeytype-backend:
     container_name: monkeytype-backend
-    image: monkeytype/monkeytype-backend:latest
+    image: monkeytype/monkeytype-backend:26.28.0
     restart: unless-stopped
 #    profiles: ["apps"]
 
@@ -257,7 +257,7 @@ services:
 
   monkeytype-frontend:
     container_name: monkeytype-frontend
-    image: monkeytype/monkeytype-frontend:latest
+    image: monkeytype/monkeytype-frontend:26.28.0
     restart: unless-stopped
 #    profiles: ["apps"]
 
