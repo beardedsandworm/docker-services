@@ -31,6 +31,7 @@ services:
     networks:
       home_network:
         ipv4_address: "${PIHOLE_IPV4_ADDRESS}"
+        mac_address: "62:2b:c1:9f:18:6f"
 
   caddy:
     container_name: caddy

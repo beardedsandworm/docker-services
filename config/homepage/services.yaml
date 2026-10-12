@@ -106,6 +106,27 @@
         href: https://emby.wormlogic.com
         description: Media server
 
+    - Navidrome:
+        icon: navidrome.png
+        href: https://music.wormlogic.com
+        description: Music streaming
+
+    - Stash:
+        icon: stash.png
+        href: https://stash.wormlogic.com
+        description: Stuff server
+
+- Aquisitions:
+    - qBittorrent:
+        icon: qbittorrent.png
+        href: https://qbittorrent.wormlogic.com
+        description: Downloads
+
+    - Prowlarr:
+        icon: prowlarr.png
+        href: https://prowlarr.wormlogic.com
+        description: Indexer management
+
     - Sonarr:
         icon: sonarr.png
         href: https://sonarr.wormlogic.com
@@ -116,15 +137,15 @@
         href: https://radarr.wormlogic.com
         description: Movie management
 
-#    - Stash:
-#        icon: stash.png
-#        href: https://stash.wormlogic.com
-#        description: Stuff server
+    - Lidarr:
+        icon: lidarr.png
+        href: https://lidarr.wormlogic.com
+        description: Music management
 
-#    - Whisparr:
-#        icon: whisparr.png
-#        href: https://whisparr.wormlogic.com
-#        description: Stuff management
+    - Whisparr:
+        icon: whisparr.png
+        href: https://whisparr.wormlogic.com
+        description: Stuff management
 
 - Utilities:
     - Hermes:
@@ -148,17 +169,7 @@
         server: arrakis
         container: monkeytype-frontend
 
-    - Prowlarr:
-        icon: prowlarr.png
-        href: https://prowlarr.wormlogic.com
-        description: Indexer management
-
-    - qBittorrent:
-        icon: qbittorrent.png
-        href: https://qbittorrent.wormlogic.com
-        description: Downloads
-
-- Monitoring and Automation:
+- Monitoring:
     - Beszel:
         icon: beszel.png
         href: https://monitor.wormlogic.com

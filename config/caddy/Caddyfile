@@ -137,3 +137,13 @@ cloud.wormlogic.com {
     import dns_tls
     reverse_proxy nextcloud:80
 }
+
+lidarr.wormlogic.com {
+    import dns_tls
+    reverse_proxy 10.42.42.3:8686
+}
+
+music.wormlogic.com {
+    import dns_tls
+    reverse_proxy 10.42.42.3:4533
+}
