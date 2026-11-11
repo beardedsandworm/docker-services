@@ -24,4 +24,5 @@ binary_sensor:
         pullup: true
     filters:
       - delayed_on: 500ms
-      - delayed_off: 500ms
+      # A refill is a durable recovery; reject slosh/contact pulses before recording it.
+      - delayed_off: 30s
